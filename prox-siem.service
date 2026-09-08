@@ -1,0 +1,15 @@
+[Unit]
+Description=prox-siem ingestion API and dashboard
+After=network.target docker.service
+
+[Service]
+Type=simple
+User=carmine
+WorkingDirectory=/home/carmine/Projects/proxsiem
+EnvironmentFile=/home/carmine/Projects/proxsiem/.env
+ExecStart=/home/carmine/Projects/proxsiem/.venv/bin/gunicorn -w 2 -b 0.0.0.0:5000 run:app
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>prox-siem</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  {% set severity_colors = {
+    'info': '#7fb3f5',
+    'notice': '#5fd0d0',
+    'warning': '#f5b942',
+    'error': '#f56b6b',
+    'unknown': '#b0a8f0'
+  } %}
+
+  <h1>prox-siem</h1>
+  <p class="subtitle">{{ total }} event{{ '' if total == 1 else 's' }} in proxmox-logs-*</p>
+
+  {% if error %}
+    <div class="error">Could not query OpenSearch: {{ error }}</div>
+  {% endif %}
+
+  {% if events %}
+  <table>
+    <thead>
+      <tr>
+        <th>Time (UTC)</th>
+        <th>Severity</th>
+        <th>Title</th>
+        <th>Message</th>
+        <th>Type</th>
+        <th>Host</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in events %}
+      <tr>
+        <td>{{ e.timestamp }}</td>
+        <td>
+          <span class="badge" style="background: {{ severity_colors.get(e.severity, severity_colors['unknown']) }}">
+            {{ e.severity }}
+          </span>
+        </td>
+        <td>{{ e.title }}</td>
+        <td class="msg">{{ e.message }}</td>
+        <td>{{ e.source_type }}</td>
+        <td>{{ e.hostname }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% elif not error %}
+    <div class="empty">No events yet. Send a test event or configure a webhook target on Proxmox.</div>
+  {% endif %}
+</body>
+</html>

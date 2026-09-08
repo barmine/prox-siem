@@ -1,0 +1,24 @@
+{
+  "index_patterns": ["proxmox-logs-*"],
+  "priority": 100,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0
+    },
+    "mappings": {
+      "properties": {
+        "timestamp": { "type": "date" },
+        "severity": { "type": "keyword" },
+        "title": {
+          "type": "text",
+          "fields": { "keyword": { "type": "keyword", "ignore_above": 256 } }
+        },
+        "message": { "type": "text" },
+        "source_type": { "type": "keyword" },
+        "hostname": { "type": "keyword" },
+        "fields": { "type": "object", "dynamic": true }
+      }
+    }
+  }
+}
