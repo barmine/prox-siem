@@ -143,9 +143,27 @@ body::before {
   align-items: center;
   gap: var(--space-md);
   padding-block: var(--space-sm);
+  padding-inline: var(--space-xs);
+  margin-inline: calc(var(--space-xs) * -1);
+  border-radius: 6px;
+  text-decoration: none;
+  color: inherit;
+  transition: background var(--dur-fast) var(--ease-out);
 }
 
 .stat-row + .stat-row { border-top: 1px solid var(--color-rule); }
+
+.stat-row:hover { background: var(--color-paper-3); }
+
+.stat-row.is-active { background: var(--color-paper-3); }
+
+.stat-row.is-active .stat-row__label {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.stat-row.is-active .stat-row__bar-fill { background: var(--color-ink); }
+.stat-row.is-active.stat-row--error .stat-row__bar-fill { background: var(--color-accent); }
 
 .stat-row__label {
   font-family: var(--font-mono);
@@ -245,6 +263,8 @@ body::before {
 /* ---------- empty / error states ---------- */
 
 .state { padding-block: var(--space-2xl); text-align: center; color: var(--color-muted); font-size: var(--text-sm); }
+.state a { color: var(--color-accent); text-decoration: underline; text-underline-offset: 0.15em; }
+.state strong { color: var(--color-ink); text-transform: uppercase; font-family: var(--font-mono); font-weight: 500; }
 
 .state--error {
   border-inline-start: 3px solid var(--color-accent);

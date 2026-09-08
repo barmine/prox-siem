@@ -21,21 +21,28 @@
     <section class="stat-hero">
       <p class="stat-hero__figure tnum" id="stat-figure" data-target="{{ total }}" aria-live="polite">0</p>
       <p class="stat-hero__qualifier">
+        {% if active_severity %}<span class="accent">{{ active_severity }}</span>{% else %}all{% endif %}
         events logged across your <span class="accent">proxmox ve</span> node and
         <span class="accent">pbs</span> instances.
       </p>
     </section>
 
     {% if severity_counts %}
-    <section class="stats" aria-label="Event counts by severity">
+    <nav class="stats" aria-label="Filter events by severity">
+      <a class="stat-row {{ 'is-active' if not active_severity }}" href="{{ url_for('dashboard.index') }}">
+        <span class="stat-row__label">all</span>
+        <span class="stat-row__bar"><span class="stat-row__bar-fill" style="width: 100%"></span></span>
+        <span class="stat-row__count">{{ all_total }}</span>
+      </a>
       {% for s in severity_counts %}
-      <div class="stat-row {{ 'stat-row--error' if s.severity == 'error' else '' }}">
+      <a class="stat-row {{ 'stat-row--error' if s.severity == 'error' else '' }} {{ 'is-active' if s.severity == active_severity }}"
+         href="{{ url_for('dashboard.index', severity=s.severity) }}">
         <span class="stat-row__label {{ 'stat-row__label--error' if s.severity == 'error' else '' }}">{{ s.severity }}</span>
         <span class="stat-row__bar"><span class="stat-row__bar-fill" style="width: {{ s.pct }}%"></span></span>
         <span class="stat-row__count">{{ s.count }}</span>
-      </div>
+      </a>
       {% endfor %}
-    </section>
+    </nav>
     {% endif %}
 
     {% if error %}
@@ -69,6 +76,8 @@
         {% endfor %}
       </div>
     </section>
+    {% elif not error and active_severity %}
+      <div class="state">No <strong>{{ active_severity }}</strong> events right now. <a href="{{ url_for('dashboard.index') }}">Clear filter</a></div>
     {% elif not error %}
       <div class="state">No events yet. Send a test event or configure a webhook target / Fluent Bit agent on Proxmox.</div>
     {% endif %}
