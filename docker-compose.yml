@@ -17,10 +17,17 @@ services:
     volumes:
       - opensearch-data:/usr/share/opensearch/data
     ports:
-      # Bound to localhost only: the ingestion API is the only intended
-      # client and runs on this same VM. Security plugin is disabled since
-      # this never leaves loopback.
+      # 127.0.0.1: the local ingestion API (Phase 1).
+      # LAN IP: Fluent Bit on the PVE node + local PBS instance (Phase 2).
+      # Security plugin stays disabled (no auth) -- access is restricted at
+      # the network layer instead (see docs/log-shipping-setup.md and the
+      # ufw rules applied on this host). Not bound to 0.0.0.0.
+      #
+      # Remote VPS PBS over Tailscale is deferred -- when picked back up,
+      # add "<tailscale-ip>:9200:9200" here once this VM has joined the
+      # tailnet (don't guess the IP; get it from `tailscale ip -4`).
       - "127.0.0.1:9200:9200"
+      - "192.168.50.248:9200:9200"
     restart: unless-stopped
 
 volumes:

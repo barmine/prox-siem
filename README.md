@@ -1,19 +1,27 @@
-# prox-siem — Phase 1
+# prox-siem
 
-A homelab SIEM for Proxmox VE + Proxmox Backup Server. Phase 1's only goal:
-get real events flowing onto a dashboard as fast as possible, using
-Proxmox's own notification system instead of parsing logs.
+A homelab SIEM for Proxmox VE + Proxmox Backup Server.
 
-Later phases (not built yet): raw log shipping via Fluent Bit → OpenSearch,
-and detection-rule scoring on top of that. Phase 1 deliberately skips both —
-Proxmox notifications already arrive as structured, severity-tagged JSON for
-backup/replication/GC/sync/cert events, which is enough to prove the whole
-pipe end-to-end before investing in log parsing.
+- **Phase 1 (done):** get real events flowing onto a dashboard as fast as
+  possible, using Proxmox's own notification system instead of parsing logs.
+- **Phase 2 (in progress — PVE node + local PBS done, remote VPS PBS
+  deferred):** raw logs (journal + task/access logs) via Fluent Bit,
+  straight into the same OpenSearch index. See
+  [`docs/log-shipping-setup.md`](docs/log-shipping-setup.md).
+- **Phase 3 (not built yet):** detection-rule scoring on top of both.
+
+Phase 1 deliberately skipped log parsing — Proxmox notifications already
+arrive as structured, severity-tagged JSON for backup/replication/GC/sync/
+cert events, which was enough to prove the whole pipe end-to-end first.
+Phase 2 fills in everything the notification system doesn't cover (auth
+failures, firewall drops, quorum/HA issues, kernel errors) by reading each
+host's own journal and log files directly.
 
 ## How the pieces fit together
 
 ```
-PVE / PBS (webhook notification) --POST--> ingestion API --index--> OpenSearch --query--> dashboard
+PVE / PBS (webhook notification) --POST--> ingestion API --\
+PVE / PBS (Fluent Bit: journal, task logs, access log) ------+--> OpenSearch --query--> dashboard
 ```
 
 **Why a webhook instead of tailing logs:** Proxmox's notification system
@@ -42,13 +50,15 @@ by timestamp is plenty fast, and it's one less moving part to keep in sync.
 ## Layout
 
 ```
-docker-compose.yml       OpenSearch, single node, bound to 127.0.0.1:9200
+docker-compose.yml       OpenSearch, single node, bound to 127.0.0.1 + LAN IP
 opensearch/               index template + ISM policy + setup.sh to apply them
 app/
   ingest.py                POST /api/events — validates, writes to OpenSearch
   dashboard.py              GET  /            — queries + renders the table
   templates/dashboard.html
-docs/webhook-setup.md    exact steps for the PVE node + both PBS instances
+fluentbit/                Phase 2: Fluent Bit config, per host role (pve/pbs) + install.sh
+docs/webhook-setup.md     Phase 1: exact steps for the PVE node + both PBS instances
+docs/log-shipping-setup.md Phase 2: exact steps for installing Fluent Bit on each host
 prox-siem.service         optional systemd unit (gunicorn)
 ```
 
