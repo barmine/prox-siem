@@ -1,27 +1,37 @@
-/* prox-siem design tokens — Hallmark theme: Grid (ultramarine signal ink) */
+/* prox-siem design tokens — Hallmark theme: Midnight (atmospheric, warm amber glow)
+ * No dedicated per-theme spec file ships in this skill install for Midnight;
+ * constructed from references/genres/atmospheric.md's explicit voice rules
+ * (single warm accent, warm-tinted neutrals, dark default canvas) rather
+ * than a locked palette. Flagged here for the next Hallmark run to see. */
 :root {
-  /* paper band — light, cool near-white */
-  --color-paper:    oklch(99%   0.003 255);
-  --color-paper-2:  oklch(97.2% 0.004 255);
-  --color-paper-3:  oklch(94.5% 0.005 255);
+  /* paper band — dark, warm-neutral near-black. Midnight = the deepest,
+     quietest member of the atmospheric cluster (Bloom is the light one). */
+  --color-paper:    oklch(12% 0.008 50);
+  --color-paper-2:  oklch(16% 0.010 50);
+  --color-paper-3:  oklch(20% 0.010 50);
 
-  /* ink */
-  --color-ink:      oklch(16%   0.010 255);
-  --color-muted:    oklch(52%   0.008 255);
-  --color-rule:     oklch(88%   0.006 255);
+  /* ink — warm-tinted per genre's own example values */
+  --color-ink:      oklch(94% 0.006 50);
+  --color-muted:    oklch(86% 0.008 40);
+  --color-rule:     oklch(28% 0.010 50);
 
-  /* the one signal ink: ultramarine — technical, institutional */
-  --color-accent:     oklch(45% 0.19 264);
-  --color-accent-ink: var(--color-paper);
-  --color-focus:       oklch(45% 0.19 264);
+  /* the one signal: warm amber-gold — a lantern against the dark canvas */
+  --color-accent:     oklch(72% 0.15 65);
+  --color-accent-ink: oklch(14% 0.010 50);
+  --color-focus:       oklch(72% 0.15 65);
 
-  /* type */
-  --font-display: "Archivo", sans-serif;
-  --font-body:    "Archivo", sans-serif;
-  --display-weight: 800;
-  --tracking-display: -0.045em;
+  /* secondary bloom hue (genre allows one warm + one secondary pink/red max) */
+  --color-bloom-2: oklch(55% 0.14 20);
 
-  --text-display:   clamp(2.6rem, 7vw, 5.2rem);
+  /* type: Geist family per atmospheric's explicit voice recommendation */
+  --font-display: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-body:    "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono:    "Geist Mono", ui-monospace, monospace;
+  --display-weight: 600;
+  --tracking-display: -0.03em;
+
+  --text-figure:  clamp(4.5rem, 14vw, 9rem);
+  --text-display: clamp(1.75rem, 4vw, 2.75rem);
   --text-xs:  0.75rem;
   --text-sm:  0.875rem;
   --text-md:  1rem;
@@ -41,10 +51,12 @@
   /* motion */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --dur-fast: 180ms;
+  --dur-fade: 400ms;
 
   /* z-scale */
   --z-base:   1;
   --z-sticky: 200;
 
-  --radius-card: 0;
+  --radius-card: 14px;
+  --radius-pill: 999px;
 }

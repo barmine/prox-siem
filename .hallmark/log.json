@@ -1,6 +1,14 @@
 [
   {
     "date": "2026-09-08",
+    "macrostructure": "Stat-Led (adapted, utility dashboard, no CTA)",
+    "theme": "Midnight",
+    "theme_axes": "dark / grotesk-sans / warm (amber)",
+    "enrichment": "none (typography + real-data stat hero + severity strip)",
+    "brief": "prox-siem dashboard retheme — SIEM event table for Proxmox VE/PBS"
+  },
+  {
+    "date": "2026-09-08",
     "macrostructure": "Index-First (adapted, utility dashboard)",
     "theme": "Grid",
     "theme_axes": "light / grotesk-heavy / cool (ultramarine)",

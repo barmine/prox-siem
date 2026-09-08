@@ -6,22 +6,25 @@
   <title>prox-siem</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
   <div class="shell">
-    <div class="rails" aria-hidden="true"></div>
 
-    <header class="masthead">
-      <h1>prox&#8209;siem</h1>
-      <p class="masthead__meta">
-        <span><strong>{{ total }}</strong> event{{ '' if total == 1 else 's' }}</span>
-        <span>proxmox ve + pbs</span>
-        <span>phase 1&ndash;2</span>
+    <nav class="nav-edge">
+      <a class="wordmark" href="/">prox&middot;siem</a>
+      <span class="status"><span class="status__dot" aria-hidden="true"></span>live</span>
+    </nav>
+
+    <section class="stat-hero">
+      <p class="stat-hero__figure tnum" id="stat-figure" data-target="{{ total }}" aria-live="polite">0</p>
+      <p class="stat-hero__qualifier">
+        events logged across your <span class="accent">proxmox ve</span> node and
+        <span class="accent">pbs</span> instances.
       </p>
-    </header>
+    </section>
 
     {% if severity_counts %}
     <section class="stats" aria-label="Event counts by severity">
@@ -41,34 +44,73 @@
 
     {% if events %}
     <section class="band">
-      <div class="row-head" role="row">
-        <span class="c-time">Time</span>
-        <span class="c-sev">Severity</span>
-        <span class="c-body">Event</span>
-        <span class="c-type">Type</span>
-        <span class="c-host">Host</span>
+      <div class="card">
+        <div class="row-head" role="row">
+          <span class="c-time">Time</span>
+          <span class="c-sev">Severity</span>
+          <span class="c-body">Event</span>
+          <span class="c-type">Type</span>
+          <span class="c-host">Host</span>
+        </div>
+        {% for e in events %}
+        <div class="row" role="row">
+          <span class="c-time" data-label="Time">{{ e.timestamp }}</span>
+          <span class="c-sev" data-label="Severity">
+            <span class="mark mark--{{ e.severity if e.severity in ['error','warning','notice','info'] else 'unknown' }}"></span>
+            <span class="sev-label">{{ e.severity }}</span>
+          </span>
+          <span class="c-body" data-label="Event">
+            {% if e.title %}<span class="c-body__title">{{ e.title }}</span>{% endif %}
+            {% if e.message %}<span class="c-body__message">{{ e.message }}</span>{% endif %}
+          </span>
+          <span class="c-type" data-label="Type">{{ e.source_type }}</span>
+          <span class="c-host" data-label="Host">{{ e.hostname }}</span>
+        </div>
+        {% endfor %}
       </div>
-      {% for e in events %}
-      <div class="row" role="row">
-        <span class="c-time" data-label="Time">{{ e.timestamp }}</span>
-        <span class="c-sev" data-label="Severity">
-          <span class="mark mark--{{ e.severity if e.severity in ['error','warning','notice','info'] else 'unknown' }}"></span>
-          <span class="sev-label">{{ e.severity }}</span>
-        </span>
-        <span class="c-body" data-label="Event">
-          {% if e.title %}<span class="c-body__title">{{ e.title }}</span>{% endif %}
-          {% if e.message %}<span class="c-body__message">{{ e.message }}</span>{% endif %}
-        </span>
-        <span class="c-type" data-label="Type">{{ e.source_type }}</span>
-        <span class="c-host" data-label="Host">{{ e.hostname }}</span>
-      </div>
-      {% endfor %}
     </section>
     {% elif not error %}
       <div class="state">No events yet. Send a test event or configure a webhook target / Fluent Bit agent on Proxmox.</div>
     {% endif %}
 
-    <footer class="foot">prox&#8209;siem &middot; opensearch &middot; internal network only</footer>
+    <footer class="foot-stmt">
+      <p class="foot-stmt__line">Every row here happened. Nothing here is a drill.</p>
+      <div class="foot-stmt__meta">
+        <span>prox&middot;siem</span>
+        <span>opensearch &middot; internal network only</span>
+      </div>
+    </footer>
   </div>
+
+  <script>
+    (function () {
+      var el = document.getElementById("stat-figure");
+      if (!el) return;
+      var target = parseInt(el.dataset.target, 10) || 0;
+      var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      var fmt = new Intl.NumberFormat();
+
+      if (reduceMotion || target === 0) {
+        el.textContent = fmt.format(target);
+        return;
+      }
+
+      var start = null;
+      var duration = 400;
+
+      function tick(ts) {
+        if (start === null) start = ts;
+        var progress = Math.min((ts - start) / duration, 1);
+        var eased = 1 - Math.pow(1 - progress, 3);
+        el.textContent = fmt.format(Math.round(eased * target));
+        if (progress < 1) {
+          requestAnimationFrame(tick);
+        } else {
+          el.textContent = fmt.format(target);
+        }
+      }
+      requestAnimationFrame(tick);
+    })();
+  </script>
 </body>
 </html>
