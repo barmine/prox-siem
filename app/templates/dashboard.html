@@ -2,57 +2,73 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>prox-siem</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-  {% set severity_colors = {
-    'info': '#7fb3f5',
-    'notice': '#5fd0d0',
-    'warning': '#f5b942',
-    'error': '#f56b6b',
-    'unknown': '#b0a8f0'
-  } %}
+  <div class="shell">
+    <div class="rails" aria-hidden="true"></div>
 
-  <h1>prox-siem</h1>
-  <p class="subtitle">{{ total }} event{{ '' if total == 1 else 's' }} in proxmox-logs-*</p>
+    <header class="masthead">
+      <h1>prox&#8209;siem</h1>
+      <p class="masthead__meta">
+        <span><strong>{{ total }}</strong> event{{ '' if total == 1 else 's' }}</span>
+        <span>proxmox ve + pbs</span>
+        <span>phase 1&ndash;2</span>
+      </p>
+    </header>
 
-  {% if error %}
-    <div class="error">Could not query OpenSearch: {{ error }}</div>
-  {% endif %}
-
-  {% if events %}
-  <table>
-    <thead>
-      <tr>
-        <th>Time (UTC)</th>
-        <th>Severity</th>
-        <th>Title</th>
-        <th>Message</th>
-        <th>Type</th>
-        <th>Host</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for e in events %}
-      <tr>
-        <td>{{ e.timestamp }}</td>
-        <td>
-          <span class="badge" style="background: {{ severity_colors.get(e.severity, severity_colors['unknown']) }}">
-            {{ e.severity }}
-          </span>
-        </td>
-        <td>{{ e.title }}</td>
-        <td class="msg">{{ e.message }}</td>
-        <td>{{ e.source_type }}</td>
-        <td>{{ e.hostname }}</td>
-      </tr>
+    {% if severity_counts %}
+    <section class="stats" aria-label="Event counts by severity">
+      {% for s in severity_counts %}
+      <div class="stat-row {{ 'stat-row--error' if s.severity == 'error' else '' }}">
+        <span class="stat-row__label {{ 'stat-row__label--error' if s.severity == 'error' else '' }}">{{ s.severity }}</span>
+        <span class="stat-row__bar"><span class="stat-row__bar-fill" style="width: {{ s.pct }}%"></span></span>
+        <span class="stat-row__count">{{ s.count }}</span>
+      </div>
       {% endfor %}
-    </tbody>
-  </table>
-  {% elif not error %}
-    <div class="empty">No events yet. Send a test event or configure a webhook target on Proxmox.</div>
-  {% endif %}
+    </section>
+    {% endif %}
+
+    {% if error %}
+      <div class="state state--error">Could not query OpenSearch: {{ error }}</div>
+    {% endif %}
+
+    {% if events %}
+    <section class="band">
+      <div class="row-head" role="row">
+        <span class="c-time">Time</span>
+        <span class="c-sev">Severity</span>
+        <span class="c-body">Event</span>
+        <span class="c-type">Type</span>
+        <span class="c-host">Host</span>
+      </div>
+      {% for e in events %}
+      <div class="row" role="row">
+        <span class="c-time" data-label="Time">{{ e.timestamp }}</span>
+        <span class="c-sev" data-label="Severity">
+          <span class="mark mark--{{ e.severity if e.severity in ['error','warning','notice','info'] else 'unknown' }}"></span>
+          <span class="sev-label">{{ e.severity }}</span>
+        </span>
+        <span class="c-body" data-label="Event">
+          {% if e.title %}<span class="c-body__title">{{ e.title }}</span>{% endif %}
+          {% if e.message %}<span class="c-body__message">{{ e.message }}</span>{% endif %}
+        </span>
+        <span class="c-type" data-label="Type">{{ e.source_type }}</span>
+        <span class="c-host" data-label="Host">{{ e.hostname }}</span>
+      </div>
+      {% endfor %}
+    </section>
+    {% elif not error %}
+      <div class="state">No events yet. Send a test event or configure a webhook target / Fluent Bit agent on Proxmox.</div>
+    {% endif %}
+
+    <footer class="foot">prox&#8209;siem &middot; opensearch &middot; internal network only</footer>
+  </div>
 </body>
 </html>

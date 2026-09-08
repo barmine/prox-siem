@@ -1,0 +1,50 @@
+/* prox-siem design tokens — Hallmark theme: Grid (ultramarine signal ink) */
+:root {
+  /* paper band — light, cool near-white */
+  --color-paper:    oklch(99%   0.003 255);
+  --color-paper-2:  oklch(97.2% 0.004 255);
+  --color-paper-3:  oklch(94.5% 0.005 255);
+
+  /* ink */
+  --color-ink:      oklch(16%   0.010 255);
+  --color-muted:    oklch(52%   0.008 255);
+  --color-rule:     oklch(88%   0.006 255);
+
+  /* the one signal ink: ultramarine — technical, institutional */
+  --color-accent:     oklch(45% 0.19 264);
+  --color-accent-ink: var(--color-paper);
+  --color-focus:       oklch(45% 0.19 264);
+
+  /* type */
+  --font-display: "Archivo", sans-serif;
+  --font-body:    "Archivo", sans-serif;
+  --display-weight: 800;
+  --tracking-display: -0.045em;
+
+  --text-display:   clamp(2.6rem, 7vw, 5.2rem);
+  --text-xs:  0.75rem;
+  --text-sm:  0.875rem;
+  --text-md:  1rem;
+  --text-lg:  1.25rem;
+
+  /* 4pt spacing scale */
+  --space-3xs: 0.125rem;
+  --space-2xs: 0.25rem;
+  --space-xs:  0.5rem;
+  --space-sm:  0.75rem;
+  --space-md:  1rem;
+  --space-lg:  1.5rem;
+  --space-xl:  2.5rem;
+  --space-2xl: 4rem;
+  --space-3xl: 6rem;
+
+  /* motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 180ms;
+
+  /* z-scale */
+  --z-base:   1;
+  --z-sticky: 200;
+
+  --radius-card: 0;
+}

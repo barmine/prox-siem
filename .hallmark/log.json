@@ -1,0 +1,10 @@
+[
+  {
+    "date": "2026-09-08",
+    "macrostructure": "Index-First (adapted, utility dashboard)",
+    "theme": "Grid",
+    "theme_axes": "light / grotesk-heavy / cool (ultramarine)",
+    "enrichment": "none (typography + real-data stat strip only)",
+    "brief": "prox-siem dashboard retheme — SIEM event table for Proxmox VE/PBS"
+  }
+]
