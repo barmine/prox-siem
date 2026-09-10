@@ -8,6 +8,9 @@
 set -euo pipefail
 
 OPENSEARCH_URL="${OPENSEARCH_URL:-http://localhost:9200}"
+# Phase 4: hot-tier retention is a config value now, not hardcoded in the
+# policy JSON -- see opensearch/ism_policy.json.template.
+ISM_HOT_RETENTION_DAYS="${ISM_HOT_RETENTION_DAYS:-30}"
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "Waiting for OpenSearch at ${OPENSEARCH_URL} ..."
@@ -15,10 +18,18 @@ until curl -s -o /dev/null -w '%{http_code}' "${OPENSEARCH_URL}" | grep -q '^200
   sleep 2
 done
 
-echo "Creating ISM policy: proxmox-logs-policy"
-curl -s -X PUT "${OPENSEARCH_URL}/_plugins/_ism/policies/proxmox-logs-policy" \
-  -H 'Content-Type: application/json' \
-  -d @"${DIR}/ism_policy.json"
+echo "Creating ISM policy: proxmox-logs-policy (hot retention: ${ISM_HOT_RETENTION_DAYS}d)"
+# NOTE: changing ISM_HOT_RETENTION_DAYS and re-running this against an
+# EXISTING policy will fail with a version_conflict -- OpenSearch ISM
+# policies use optimistic concurrency (seq_no/primary_term) and a plain
+# PUT can't blindly overwrite a policy that already differs. To change
+# retention later, delete the policy first:
+#   curl -X DELETE "${OPENSEARCH_URL}/_plugins/_ism/policies/proxmox-logs-policy"
+# then re-run this script.
+sed "s/\${HOT_RETENTION_DAYS}/${ISM_HOT_RETENTION_DAYS}/g" "${DIR}/ism_policy.json.template" \
+  | curl -s -X PUT "${OPENSEARCH_URL}/_plugins/_ism/policies/proxmox-logs-policy" \
+      -H 'Content-Type: application/json' \
+      -d @-
 echo
 
 echo "Creating index template: proxmox-logs-template"

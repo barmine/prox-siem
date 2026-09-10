@@ -1,13 +1,13 @@
 {
   "policy": {
-    "description": "proxmox-logs-*: hot for 30 days, then delete.",
+    "description": "proxmox-logs-*: hot for ${HOT_RETENTION_DAYS} days, then delete.",
     "default_state": "hot",
     "states": [
       {
         "name": "hot",
         "actions": [],
         "transitions": [
-          { "state_name": "delete", "conditions": { "min_index_age": "30d" } }
+          { "state_name": "delete", "conditions": { "min_index_age": "${HOT_RETENTION_DAYS}d" } }
         ]
       },
       {
