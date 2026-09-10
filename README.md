@@ -4,11 +4,17 @@ A homelab SIEM for Proxmox VE + Proxmox Backup Server.
 
 - **Phase 1 (done):** get real events flowing onto a dashboard as fast as
   possible, using Proxmox's own notification system instead of parsing logs.
-- **Phase 2 (in progress — PVE node + local PBS done, remote VPS PBS
-  deferred):** raw logs (journal + task/access logs) via Fluent Bit,
+- **Phase 2 (done):** raw logs (journal + task/access logs) via Fluent Bit,
   straight into the same OpenSearch index. See
   [`docs/log-shipping-setup.md`](docs/log-shipping-setup.md).
-- **Phase 3 (not built yet):** detection-rule scoring on top of both.
+- **Phase 3 (done):** detection rules tag events at write time, a periodic
+  job dedups bursts into clusters, and a ranking endpoint + dashboard
+  "Top Important" tab surface what actually needs attention. The main
+  dashboard also gained pagination, a cluster drill-down, and severity/host
+  filters for digging through the raw stream. See
+  [`docs/detection-rules.md`](docs/detection-rules.md).
+- **Phase 4 (not built yet):** outbound alerting (ntfy/Discord/Gotify) and
+  a pipeline-health page.
 
 Phase 1 deliberately skipped log parsing — Proxmox notifications already
 arrive as structured, severity-tagged JSON for backup/replication/GC/sync/
@@ -51,15 +57,25 @@ by timestamp is plenty fast, and it's one less moving part to keep in sync.
 
 ```
 docker-compose.yml       OpenSearch, single node, bound to 127.0.0.1 + LAN IP
-opensearch/               index template + ISM policy + setup.sh to apply them
+rules.yaml                Phase 3: detection rules (shared by both ingestion paths)
+opensearch/               index template + ISM policy + clusters index + rules
+                          ingest pipeline (generated from rules.yaml) + setup.sh
 app/
-  ingest.py                POST /api/events — validates, writes to OpenSearch
-  dashboard.py              GET  /            — queries + renders the table
-  templates/dashboard.html
+  ingest.py                POST /api/events — validates, tags, writes to OpenSearch
+  dashboard.py              GET  /  and  /top  — queries + renders the tables
+  rules_engine.py           loads rules.yaml, matches notification-path docs
+  dedup.py                  burst-dedup: groups matched docs into clusters
+  ranking.py                GET /api/top-important — scores active clusters
+  templates/dashboard.html, top_important.html
 fluentbit/                Phase 2: Fluent Bit config, per host role (pve/pbs) + install.sh
+                          (raw-log path tagged via the rules ingest pipeline)
+scripts/run_dedup.py      standalone entrypoint for prox-siem-dedup.timer
+scripts/test_phase3.py    end-to-end test: synthetic events -> tag -> dedup -> rank
 docs/webhook-setup.md     Phase 1: exact steps for the PVE node + both PBS instances
 docs/log-shipping-setup.md Phase 2: exact steps for installing Fluent Bit on each host
+docs/detection-rules.md   Phase 3: rules.yaml syntax, dedup, ranking, testing
 prox-siem.service         optional systemd unit (gunicorn)
+prox-siem-dedup.service/.timer  runs the dedup job every ~60s
 ```
 
 The ingestion API and dashboard are two Flask blueprints in one process —

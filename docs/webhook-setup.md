@@ -31,8 +31,15 @@ On each host: **Datacenter → Notifications → Add → Webhook** (PVE) or
 | Method | `POST` |
 | Header 1 | Name: `Content-Type`, Value: `application/json` |
 | Header 2 | Name: `X-Prox-Siem-Secret`, Value: `{{ secrets.shared_secret }}` |
-| Secret | Name: `shared_secret`, Value: `<your SHARED_SECRET value>` |
 | Body | see below |
+
+**Don't skip this part** — it's easy to miss because it's a separate
+section of the same dialog, below Headers, not another header row: add a
+**Secret** with Name `shared_secret`, Value `<your SHARED_SECRET value>`
+(the same string as `SHARED_SECRET` in `.env` on the SIEM VM). Without it,
+`{{ secrets.shared_secret }}` in Header 2 above has nothing to resolve to,
+so the `X-Prox-Siem-Secret` header goes out empty and the ingestion API
+rejects the request with 401.
 
 Body (Handlebars template — paste exactly, `escape` guards against control
 characters/quotes breaking the JSON):
@@ -44,8 +51,8 @@ characters/quotes breaking the JSON):
   "title": "{{ escape title }}",
   "message": "{{ escape message }}",
   "fields": {
-    "type": "{{ escape fields.type }}",
-    "hostname": "{{ escape fields.hostname }}"
+    "type": "{{#if fields.type}}{{escape fields.type}}{{/if}}",
+    "hostname": "{{#if fields.hostname}}{{escape fields.hostname}}{{/if}}"
   }
 }
 ```
@@ -56,6 +63,19 @@ This matches what `app/ingest.py` expects: `timestamp` (epoch seconds) and
 types (backup job, replication, GC, sync, cert renewal, etc.) — if a
 specific event doesn't set one, it just renders empty and the ingestion API
 falls back to `"unknown"`.
+
+The `{{#if fields.type}}...{{/if}}` wrapping is required, not stylistic:
+Proxmox's webhook templating runs Handlebars in strict mode, where passing
+a path that doesn't resolve (e.g. `fields.type` when no `fields.type` key
+exists in the notification's context) directly as a helper argument —
+`{{ escape fields.type }}` — throws instead of rendering empty. The
+`#if` block checks the path without that restriction, so it only calls
+`escape` when the key is actually present. This matters most for the
+Proxmox GUI's **Test** button, whose synthetic notification doesn't set
+`fields.type`/`fields.hostname` at all — without the `#if` guard, Test
+always fails with `Helper/Decorator escape param at index 0 required but
+not found`, even though real events (which do set those keys) render
+fine.
 
 ## 2. Add a catch-all matcher (GUI)
 
@@ -83,7 +103,7 @@ pvesh create /cluster/notifications/endpoints/webhook \
   --method POST \
   --header '[{"name":"Content-Type","value":"application/json"},{"name":"X-Prox-Siem-Secret","value":"{{ secrets.shared_secret }}"}]' \
   --secret '[{"name":"shared_secret","value":"<your SHARED_SECRET value>"}]' \
-  --body '{"timestamp": {{ timestamp }}, "severity": "{{ escape severity }}", "title": "{{ escape title }}", "message": "{{ escape message }}", "fields": {"type": "{{ escape fields.type }}", "hostname": "{{ escape fields.hostname }}"}}'
+  --body '{"timestamp": {{ timestamp }}, "severity": "{{ escape severity }}", "title": "{{ escape title }}", "message": "{{ escape message }}", "fields": {"type": "{{#if fields.type}}{{escape fields.type}}{{/if}}", "hostname": "{{#if fields.hostname}}{{escape fields.hostname}}{{/if}}"}}'
 
 pvesh create /cluster/notifications/matchers \
   --name prox-siem-catchall \

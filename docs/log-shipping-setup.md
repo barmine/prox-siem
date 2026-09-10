@@ -168,3 +168,43 @@ concrete rather than waiting:
   `source_type: access-log` hit.
 - PBS: run a manual prune/GC/backup job, then check for a
   `source_type: task-log` hit on the PBS host.
+
+## Troubleshooting: deployed config has drifted from this repo
+
+`install.sh` copies `fluentbit/` onto a host once, at install time — it does
+**not** keep that host in sync with later changes to this repo. Every host
+running Fluent Bit is its own independent deployment, so a fix or feature
+landed here (this repo's `fluentbit/conf.d/output-opensearch.conf`, for
+example) has no effect anywhere until you redeploy it.
+
+This bit a live rollout once already: `minibackups` (a PBS host) was still
+running a config with the pre-fix `Time_Key_Format
+%Y-%m-%dT%H:%M:%S.%LZ` (see the comment on that line in
+`fluentbit/conf.d/output-opensearch.conf` for why `%L` is wrong) long after
+that had been fixed in this repo. Fluent Bit doesn't substitute `%L`, so
+every timestamp came out as a literal `...20:44:27.%LZ.475Z`, which
+OpenSearch's date parser rejects — **100% of that host's writes failed**,
+silently retried, and eventually got dropped, with `journalctl -u
+fluent-bit` showing only generic `failed to flush chunk` warnings and no
+indication of the actual cause.
+
+If a host isn't shipping (or `rule_id`/`category`/`severity_weight` never
+show up on its raw-log docs, meaning it's missing the `Pipeline
+proxmox-logs-rules` line entirely):
+
+1. Diff the deployed config against this repo instead of assuming they
+   match:
+   ```bash
+   diff /etc/fluent-bit/conf.d/output-opensearch.conf fluentbit/conf.d/output-opensearch.conf
+   ```
+2. If they differ, redeploy the whole `fluentbit/` directory (simplest: rerun
+   `install.sh` with the same `--role`/`--siem-host` as originally used) and
+   `systemctl restart fluent-bit`.
+3. If Fluent Bit is running but nothing's landing and the reason isn't
+   obvious from `journalctl -u fluent-bit -n 50`, get the real OpenSearch
+   response instead of guessing: temporarily add `Trace_Error On` to that
+   host's `output-opensearch.conf` and set `Log_Level debug` in
+   `common.conf`, restart, and the next failed flush will log OpenSearch's
+   actual rejection reason (mapping error, missing pipeline, etc.) instead
+   of just "failed to flush chunk". Revert both afterward — debug logging is
+   noisy.
