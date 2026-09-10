@@ -8,13 +8,19 @@ A homelab SIEM for Proxmox VE + Proxmox Backup Server.
   straight into the same OpenSearch index. See
   [`docs/log-shipping-setup.md`](docs/log-shipping-setup.md).
 - **Phase 3 (done):** detection rules tag events at write time, a periodic
-  job dedups bursts into clusters, and a ranking endpoint + dashboard
-  "Top Important" tab surface what actually needs attention. The main
-  dashboard also gained pagination, a cluster drill-down, and severity/host
-  filters for digging through the raw stream. See
+  job dedups bursts into clusters, and a ranking endpoint scores active
+  clusters by severity x recency x frequency. See
   [`docs/detection-rules.md`](docs/detection-rules.md).
-- **Phase 4 (not built yet):** outbound alerting (ntfy/Discord/Gotify) and
-  a pipeline-health page.
+- **Phase 4 (done):** the UI became one coherent app -- **Overview**
+  (ranked clusters, with host/category/time-range filters), **Explore**
+  (free-text search + field filters across the raw stream), and
+  **Pipeline Health** (per-source last-seen tracking, so a dead Fluent Bit
+  agent or dropped Tailscale link shows up as "no data" instead of
+  silently looking like "no problems"). Outbound alerting (ntfy by
+  default, Discord/Gotify are just a different webhook target) fires once
+  when a cluster first turns critical. ISM hot-tier retention is now a
+  config value. See
+  [`docs/phase4-operations.md`](docs/phase4-operations.md).
 
 Phase 1 deliberately skipped log parsing — Proxmox notifications already
 arrive as structured, severity-tagged JSON for backup/replication/GC/sync/
@@ -58,22 +64,27 @@ by timestamp is plenty fast, and it's one less moving part to keep in sync.
 ```
 docker-compose.yml       OpenSearch, single node, bound to 127.0.0.1 + LAN IP
 rules.yaml                Phase 3: detection rules (shared by both ingestion paths)
-opensearch/               index template + ISM policy + clusters index + rules
-                          ingest pipeline (generated from rules.yaml) + setup.sh
+opensearch/               index template + ISM policy template + clusters index +
+                          rules ingest pipeline (generated from rules.yaml) + setup.sh
 app/
   ingest.py                POST /api/events — validates, tags, writes to OpenSearch
-  dashboard.py              GET  /  and  /top  — queries + renders the tables
+  dashboard.py              GET  /  (Overview), /explore (Explore), /top (redirect)
   rules_engine.py           loads rules.yaml, matches notification-path docs
-  dedup.py                  burst-dedup: groups matched docs into clusters
+  dedup.py                  burst-dedup: groups matched docs into clusters, fires alerts
   ranking.py                GET /api/top-important — scores active clusters
-  templates/dashboard.html, top_important.html
+  alerting.py               Phase 4: outbound webhook notifications (ntfy/Discord/Gotify)
+  pipeline_health.py         GET /pipeline-health — per-source last-seen tracking
+  templates/base.html        shared shell (nav/footer) — overview.html, explore.html,
+                             pipeline_health.html all extend it
 fluentbit/                Phase 2: Fluent Bit config, per host role (pve/pbs) + install.sh
-                          (raw-log path tagged via the rules ingest pipeline)
+                          (raw-log path tagged via the rules ingest pipeline; common.conf
+                          also emits a Phase 4 per-host heartbeat)
 scripts/run_dedup.py      standalone entrypoint for prox-siem-dedup.timer
 scripts/test_phase3.py    end-to-end test: synthetic events -> tag -> dedup -> rank
 docs/webhook-setup.md     Phase 1: exact steps for the PVE node + both PBS instances
 docs/log-shipping-setup.md Phase 2: exact steps for installing Fluent Bit on each host
 docs/detection-rules.md   Phase 3: rules.yaml syntax, dedup, ranking, testing
+docs/phase4-operations.md Phase 4: Pipeline Health, alerting, ISM retention config
 prox-siem.service         optional systemd unit (gunicorn)
 prox-siem-dedup.service/.timer  runs the dedup job every ~60s
 ```
