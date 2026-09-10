@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>prox-siem &middot; top important</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="shell">
+
+    <nav class="nav-edge">
+      <a class="wordmark" href="/">prox&middot;siem</a>
+      <span class="status"><span class="status__dot" aria-hidden="true"></span>live</span>
+    </nav>
+
+    <nav class="view-tabs" aria-label="Switch view">
+      <a class="view-tab" href="{{ url_for('dashboard.index') }}">all events</a>
+      <a class="view-tab is-active" href="{{ url_for('dashboard.top_important') }}">top important</a>
+    </nav>
+
+    <section class="stat-hero">
+      <p class="stat-hero__figure tnum" id="stat-figure" data-target="{{ clusters|length }}" aria-live="polite">0</p>
+      <p class="stat-hero__qualifier">
+        active <span class="accent">cluster{{ 's' if clusters|length != 1 else '' }}</span>, ranked by
+        severity &times; recency &times; frequency -- what actually needs attention right now.
+      </p>
+    </section>
+
+    {% if error %}
+      <div class="state state--error">Could not query rankings: {{ error }}</div>
+    {% elif not clusters %}
+      <div class="state">Nothing ranked right now. Either nothing's matched a detection rule recently, or the dedup job hasn't run yet -- see <code>prox-siem-dedup.timer</code>.</div>
+    {% else %}
+    <section class="band">
+      <div class="cluster-grid">
+        {% for c in clusters %}
+        <a class="cluster-card cluster-card--{{ c.severity_label }}" href="{{ url_for('dashboard.index', cluster=c.cluster_key) }}">
+          <div class="cluster-card__top">
+            <span class="mark mark--{{ 'error' if c.severity_label == 'critical' else c.severity_label }}"></span>
+            <span class="sev-label">{{ c.severity_label }}</span>
+            <span class="cluster-card__category">{{ c.category }}</span>
+            <span class="cluster-card__score tnum" title="severity x recency x log(frequency)">{{ c.score }}</span>
+          </div>
+          <p class="cluster-card__message">{{ c.sample_message or '(no message)' }}</p>
+          <div class="cluster-card__meta">
+            <span class="cluster-card__host">{{ c.hostname }}</span>
+            <span class="cluster-card__count">&times;{{ c.count }}</span>
+          </div>
+          <div class="cluster-card__meta cluster-card__meta--muted">
+            <span>first seen {{ c.first_seen }}</span>
+            <span>last seen {{ c.last_seen }}</span>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    <footer class="foot-stmt">
+      <p class="foot-stmt__line">Every row here happened. Nothing here is a drill.</p>
+      <div class="foot-stmt__meta">
+        <span>prox&middot;siem</span>
+        <span>opensearch &middot; internal network only</span>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      var el = document.getElementById("stat-figure");
+      if (!el) return;
+      var target = parseInt(el.dataset.target, 10) || 0;
+      var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      var fmt = new Intl.NumberFormat();
+
+      if (reduceMotion || target === 0) {
+        el.textContent = fmt.format(target);
+        return;
+      }
+
+      var start = null;
+      var duration = 400;
+
+      function tick(ts) {
+        if (start === null) start = ts;
+        var progress = Math.min((ts - start) / duration, 1);
+        var eased = 1 - Math.pow(1 - progress, 3);
+        el.textContent = fmt.format(Math.round(eased * target));
+        if (progress < 1) {
+          requestAnimationFrame(tick);
+        } else {
+          el.textContent = fmt.format(target);
+        }
+      }
+      requestAnimationFrame(tick);
+    })();
+  </script>
+</body>
+</html>

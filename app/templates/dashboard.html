@@ -18,29 +18,50 @@
       <span class="status"><span class="status__dot" aria-hidden="true"></span>live</span>
     </nav>
 
+    <nav class="view-tabs" aria-label="Switch view">
+      <a class="view-tab is-active" href="{{ url_for('dashboard.index') }}">all events</a>
+      <a class="view-tab" href="{{ url_for('dashboard.top_important') }}">top important</a>
+    </nav>
+
     <section class="stat-hero">
       <p class="stat-hero__figure tnum" id="stat-figure" data-target="{{ total }}" aria-live="polite">0</p>
       <p class="stat-hero__qualifier">
-        {% if active_severity %}<span class="accent">{{ active_severity }}</span>{% else %}all{% endif %}
-        events logged across your <span class="accent">proxmox ve</span> node and
-        <span class="accent">pbs</span> instances.
+        {% if active_cluster %}
+          events in this <span class="accent">cluster</span>.
+          <a href="{{ url_for('dashboard.top_important') }}">&larr; back to top important</a>
+        {% else %}
+          {% if active_severity %}<span class="accent">{{ active_severity }}</span>{% else %}all{% endif %}
+          events{% if active_hostname %} on <span class="accent">{{ active_hostname }}</span>{% endif %}
+          logged across your <span class="accent">proxmox ve</span> node and
+          <span class="accent">pbs</span> instances.
+        {% endif %}
       </p>
     </section>
 
     {% if severity_counts %}
     <nav class="stats" aria-label="Filter events by severity">
-      <a class="stat-row {{ 'is-active' if not active_severity }}" href="{{ url_for('dashboard.index') }}">
+      <a class="stat-row {{ 'is-active' if not active_severity }}" href="{{ url_for('dashboard.index', page_size=page_size, cluster=active_cluster, hostname=active_hostname) }}">
         <span class="stat-row__label">all</span>
         <span class="stat-row__bar"><span class="stat-row__bar-fill" style="width: 100%"></span></span>
         <span class="stat-row__count">{{ all_total }}</span>
       </a>
       {% for s in severity_counts %}
       <a class="stat-row {{ 'stat-row--error' if s.severity == 'error' else '' }} {{ 'is-active' if s.severity == active_severity }}"
-         href="{{ url_for('dashboard.index', severity=s.severity) }}">
+         href="{{ url_for('dashboard.index', severity=s.severity, page_size=page_size, cluster=active_cluster, hostname=active_hostname) }}">
         <span class="stat-row__label {{ 'stat-row__label--error' if s.severity == 'error' else '' }}">{{ s.severity }}</span>
         <span class="stat-row__bar"><span class="stat-row__bar-fill" style="width: {{ s.pct }}%"></span></span>
         <span class="stat-row__count">{{ s.count }}</span>
       </a>
+      {% endfor %}
+    </nav>
+    {% endif %}
+
+    {% if hostnames %}
+    <nav class="host-filter" aria-label="Filter events by host">
+      <a class="host-chip {{ 'is-active' if not active_hostname }}" href="{{ url_for('dashboard.index', severity=active_severity, page_size=page_size, cluster=active_cluster) }}">all hosts</a>
+      {% for h in hostnames %}
+      <a class="host-chip {{ 'is-active' if h == active_hostname }}"
+         href="{{ url_for('dashboard.index', severity=active_severity, page_size=page_size, cluster=active_cluster, hostname=h) }}">{{ h }}</a>
       {% endfor %}
     </nav>
     {% endif %}
@@ -68,16 +89,59 @@
           </span>
           <span class="c-body" data-label="Event">
             {% if e.title %}<span class="c-body__title">{{ e.title }}</span>{% endif %}
+            {% if e.category %}<span class="c-body__rule">{{ e.category }}</span>{% endif %}
             {% if e.message %}<span class="c-body__message">{{ e.message }}</span>{% endif %}
           </span>
           <span class="c-type" data-label="Type">{{ e.source_type }}</span>
-          <span class="c-host" data-label="Host">{{ e.hostname }}</span>
+          <span class="c-host" data-label="Host">
+            {% if active_cluster or e.hostname == active_hostname %}
+              {{ e.hostname }}
+            {% else %}
+              <a href="{{ url_for('dashboard.index', severity=active_severity, page_size=page_size, hostname=e.hostname) }}">{{ e.hostname }}</a>
+            {% endif %}
+          </span>
         </div>
         {% endfor %}
       </div>
+
+      <nav class="pager" aria-label="Rows per page and pagination">
+        <div class="pager__sizes">
+          <span class="pager__label">show</span>
+          {% for opt in page_size_options %}
+          <a class="pager__size {{ 'is-active' if page_size == opt }}"
+             href="{{ url_for('dashboard.index', severity=active_severity, cluster=active_cluster, hostname=active_hostname, page_size=opt) }}">{{ opt }}</a>
+          {% endfor %}
+          <a class="pager__size {{ 'is-active' if page_size == 'all' }}"
+             href="{{ url_for('dashboard.index', severity=active_severity, cluster=active_cluster, hostname=active_hostname, page_size='all') }}">all</a>
+        </div>
+
+        {% if total_pages > 1 %}
+        <div class="pager__nav">
+          {% if page > 1 %}
+          <a class="pager__link" href="{{ url_for('dashboard.index', severity=active_severity, cluster=active_cluster, hostname=active_hostname, page_size=page_size, page=page - 1) }}">&larr; newer</a>
+          {% else %}
+          <span class="pager__link is-disabled" aria-disabled="true">&larr; newer</span>
+          {% endif %}
+
+          <span class="pager__status">page {{ page }} of {{ total_pages }}</span>
+
+          {% if page < total_pages %}
+          <a class="pager__link" href="{{ url_for('dashboard.index', severity=active_severity, cluster=active_cluster, hostname=active_hostname, page_size=page_size, page=page + 1) }}">older &rarr;</a>
+          {% else %}
+          <span class="pager__link is-disabled" aria-disabled="true">older &rarr;</span>
+          {% endif %}
+        </div>
+        {% endif %}
+      </nav>
     </section>
-    {% elif not error and active_severity %}
-      <div class="state">No <strong>{{ active_severity }}</strong> events right now. <a href="{{ url_for('dashboard.index') }}">Clear filter</a></div>
+    {% elif not error and active_cluster %}
+      <div class="state">No raw documents found for this cluster (it may have aged out). <a href="{{ url_for('dashboard.top_important') }}">Back to top important</a></div>
+    {% elif not error and (active_severity or active_hostname) %}
+      <div class="state">
+        No {% if active_severity %}<strong>{{ active_severity }}</strong>{% endif %}
+        events{% if active_hostname %} on <strong>{{ active_hostname }}</strong>{% endif %}
+        right now. <a href="{{ url_for('dashboard.index', page_size=page_size) }}">Clear filters</a>
+      </div>
     {% elif not error %}
       <div class="state">No events yet. Send a test event or configure a webhook target / Fluent Bit agent on Proxmox.</div>
     {% endif %}
