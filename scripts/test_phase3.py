@@ -31,6 +31,7 @@ from app.config import Config  # noqa: E402
 from app.dedup import run_once  # noqa: E402
 from app.opensearch_client import make_client  # noqa: E402
 from app.ranking import get_top_clusters  # noqa: E402
+from app.rules_engine import RuleEngine  # noqa: E402
 
 BASE_URL = os.environ.get("SIEM_BASE_URL", "http://localhost:5000")
 PIPELINE = "proxmox-logs-rules"
@@ -184,7 +185,8 @@ def main():
 
     print("\n5. Running the dedup job once")
     config = {k: v for k, v in vars(Config).items() if not k.startswith("_")}
-    result = run_once(client, config)
+    rules = RuleEngine(config["RULES_PATH"])
+    result = run_once(client, config, rules=rules)
     print(f"  dedup processed {result['docs_processed']} matched docs cluster-wide into {result['buckets']} clusters")
 
     client.indices.refresh(index=config["CLUSTERS_INDEX"])

@@ -16,6 +16,10 @@ import hashlib
 import re
 from datetime import datetime, timedelta, timezone
 
+from opensearchpy.exceptions import NotFoundError
+
+from .alerting import send_alert
+
 _DIGITS = re.compile(r"\d+")
 
 
@@ -33,7 +37,11 @@ def _cluster_key(rule_id, hostname, normalized_message):
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()
 
 
-def run_once(client, config):
+def run_once(client, config, rules=None):
+    """rules is a RuleEngine (app/rules_engine.py), used only to decide
+    whether a cluster is newly critical for Phase 4 alerting -- pass None
+    to skip alerting entirely (e.g. one-off/test invocations that don't
+    care about it)."""
     prefix = config["INDEX_PREFIX"]
     clusters_index = config["CLUSTERS_INDEX"]
     lookback = timedelta(minutes=config["DEDUP_LOOKBACK_MINUTES"])
@@ -87,6 +95,27 @@ def run_once(client, config):
         bucket["doc_ids"].append((hit["_index"], hit["_id"]))
 
     for bucket in buckets.values():
+        # Phase 4 alerting: fire once when a cluster crosses into critical,
+        # not on every recurrence. `alerted` lives on the cluster doc
+        # itself so the throttle survives across runs with no extra
+        # infra -- and a cluster that ages out (deleted by the retention
+        # cleanup below) and later reappears as a fresh burst naturally
+        # gets a new alert, which is correct: that's a new occurrence.
+        alerted = False
+        if rules is not None and rules.label_for_weight(bucket["severity_weight"]) == "critical":
+            try:
+                existing = client.get(index=clusters_index, id=bucket["cluster_key"])
+                alerted = bool(existing["_source"].get("alerted"))
+            except NotFoundError:
+                alerted = False
+
+            if not alerted:
+                try:
+                    send_alert(config, bucket)
+                except Exception:
+                    pass  # best-effort -- a broken webhook target shouldn't break dedup
+            alerted = True
+
         client.index(
             index=clusters_index,
             id=bucket["cluster_key"],
@@ -101,6 +130,7 @@ def run_once(client, config):
                 "first_seen": bucket["first_seen"],
                 "last_seen": bucket["last_seen"],
                 "updated_at": now.isoformat(),
+                "alerted": alerted,
             },
         )
 
