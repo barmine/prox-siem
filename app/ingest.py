@@ -35,10 +35,20 @@ def create_event():
         "severity": payload["severity"],
         "title": payload.get("title", ""),
         "message": payload.get("message", ""),
-        "source_type": fields.get("type", "unknown"),
-        "hostname": fields.get("hostname", "unknown"),
+        "source_type": fields.get("type") or "unknown",
+        "hostname": fields.get("hostname") or "unknown",
         "fields": fields,
     }
+
+    # Phase 3: tag at write time -- the raw Fluent Bit path gets the same
+    # rules.yaml applied via an OpenSearch ingest pipeline instead (see
+    # opensearch/generate_rules_pipeline.py), since it never passes through
+    # this API.
+    rule = current_app.extensions["rules"].match(doc)
+    if rule is not None:
+        doc["rule_id"] = rule.id
+        doc["category"] = rule.category
+        doc["severity_weight"] = rule.weight
 
     index_name = f"{current_app.config['INDEX_PREFIX']}-{datetime.now(timezone.utc):%Y.%m.%d}"
     client = current_app.extensions["opensearch"]

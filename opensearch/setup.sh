@@ -27,4 +27,18 @@ curl -s -X PUT "${OPENSEARCH_URL}/_index_template/proxmox-logs-template" \
   -d @"${DIR}/index_template.json"
 echo
 
+# Phase 3: clusters index (burst-dedup output) + the ingest pipeline that
+# tags Fluent Bit's raw-log path from rules.yaml. PUT on an existing index
+# errors with resource_already_exists_exception -- expected/harmless on
+# re-run, same as the ISM policy above.
+echo "Creating index: proxmox-clusters"
+curl -s -X PUT "${OPENSEARCH_URL}/proxmox-clusters" \
+  -H 'Content-Type: application/json' \
+  -d @"${DIR}/clusters_index.json"
+echo
+
+echo "Generating ingest pipeline: proxmox-logs-rules (from rules.yaml)"
+OPENSEARCH_URL="${OPENSEARCH_URL}" python3 "${DIR}/generate_rules_pipeline.py"
+echo
+
 echo "Done."

@@ -18,7 +18,11 @@
         "source_type": { "type": "keyword" },
         "hostname": { "type": "keyword" },
         "unit": { "type": "keyword" },
-        "fields": { "type": "object", "dynamic": true }
+        "fields": { "type": "object", "dynamic": true },
+        "rule_id": { "type": "keyword" },
+        "category": { "type": "keyword" },
+        "severity_weight": { "type": "integer" },
+        "cluster_key": { "type": "keyword" }
       }
     }
   }

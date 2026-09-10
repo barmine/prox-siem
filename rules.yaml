@@ -1,0 +1,173 @@
+# Phase 3 detection rules.
+#
+# Applied at write time, not at dashboard read time:
+#   - notification-path docs (Flask ingestion API, app/ingest.py) are
+#     matched in Python -- see app/rules_engine.py
+#   - Fluent Bit raw-log docs are matched by an OpenSearch ingest pipeline
+#     generated FROM THIS FILE -- see opensearch/generate_rules_pipeline.py
+#     and fluentbit/conf.d/output-opensearch.conf's `Pipeline` setting
+# Both engines use the same match syntax below, so a rule is only ever
+# written once. To add a rule: add an entry under `rules:` and re-run
+# `./opensearch/setup.sh` (regenerates the ingest pipeline) -- no
+# application code changes needed. The Flask app re-reads this file on
+# every restart.
+#
+# Rules are evaluated top-to-bottom; the FIRST rule whose conditions all
+# match wins (a document gets at most one rule_id/category/severity_weight).
+# Put more specific rules above more generic ones that could also match the
+# same document -- see task-failed-backup vs. task-failed-generic below.
+#
+# match: a list of conditions, ALL of which must hold (AND -- there's no OR
+# in this schema; write a second rule if you need one). Each condition is
+# exactly one of:
+#   - field: <name>
+#     equals: <string>       exact string match
+#   - field: <name>
+#     not_equals: <string>   field present and does not equal this string
+#   - field: <name>
+#     regex: <pattern>       unanchored search (like Python re.search /
+#                            Java Matcher.find), works the same in both the
+#                            Python and Painless engines. Inline flags like
+#                            (?i) are supported by both.
+# <name> is a top-level document field (severity, title, message,
+# source_type, hostname, unit) or a dotted path into the nested fields.*
+# object (e.g. fields.type).
+
+severities:
+  critical: 100
+  warning: 50
+  info: 10
+
+rules:
+  # --- task logs: most specific first. A failed vzdump/backup task should
+  # file as a Backup-category critical, not the generic Jobs/warning
+  # fallback at the bottom of this file. ---
+  - id: task-failed-backup
+    description: Backup/vzdump task exited with a non-OK status
+    category: Jobs
+    severity: critical
+    match:
+      - field: source_type
+        equals: task-log
+      - field: message
+        not_equals: OK
+      - field: unit
+        regex: "(?i)(vzdump|backup)"
+
+  # --- Proxmox notification-webhook events (Phase 1 path) ---
+  # NOTE: fields.type's real values haven't been confirmed against a live
+  # webhook payload yet (see docs/webhook-setup.md) -- these match on
+  # title/message text instead, which holds up regardless of what fields.type
+  # turns out to contain. Tighten with a fields.type condition once real
+  # payloads have been observed.
+  - id: backup-job-failed
+    description: Backup job failed (Proxmox notification)
+    category: Backup
+    severity: critical
+    match:
+      - field: title
+        regex: "(?i)backup"
+      - field: message
+        regex: "(?i)fail"
+
+  - id: replication-job-failed
+    description: Replication job failed (Proxmox notification)
+    category: Backup
+    severity: warning
+    match:
+      - field: title
+        regex: "(?i)replicat"
+      - field: message
+        regex: "(?i)fail"
+
+  - id: pbs-gc-prune-verify-failed
+    description: GC / prune / verify job failed (PBS notification)
+    category: Backup
+    severity: warning
+    match:
+      - field: title
+        regex: "(?i)(garbage collect|prune|verif)"
+      - field: message
+        regex: "(?i)fail"
+
+  - id: acme-renewal-failed
+    description: ACME certificate renewal failed
+    category: System
+    severity: warning
+    match:
+      - field: title
+        regex: "(?i)(acme|certificate)"
+      - field: message
+        regex: "(?i)fail"
+
+  # --- systemd journal (Phase 2 path) ---
+  - id: quorum-lost
+    description: Quorum lost or corosync retransmit storm
+    category: Cluster
+    severity: critical
+    match:
+      - field: unit
+        regex: "(?i)^(corosync\\.service|pve-cluster\\.service)$"
+      - field: message
+        regex: "(?i)(quorum|retransmit)"
+
+  - id: zfs-pool-degraded
+    description: ZFS pool DEGRADED or FAULTED
+    category: Storage
+    severity: critical
+    match:
+      - field: unit
+        equals: kernel
+      - field: message
+        regex: "(?i)\\b(DEGRADED|FAULTED)\\b"
+
+  - id: pam-auth-failure
+    description: Repeated PAM auth failures (pvedaemon, sshd)
+    category: Access
+    severity: critical
+    match:
+      - field: unit
+        regex: "(?i)^(pvedaemon\\.service|ssh\\.service)$"
+      - field: message
+        regex: "(?i)(authentication failure|failed password|auth failure)"
+
+  - id: ha-fencing
+    description: HA fencing or node relocation
+    category: Cluster
+    severity: warning
+    match:
+      - field: unit
+        regex: "(?i)^(pve-ha-lrm\\.service|pve-ha-crm\\.service)$"
+      - field: message
+        regex: "(?i)(fenc|relocat)"
+
+  - id: oom-killer
+    description: OOM killer invoked
+    category: System
+    severity: warning
+    match:
+      - field: unit
+        equals: kernel
+      - field: message
+        regex: "(?i)(out of memory|oom-killer|oom_kill)"
+
+  - id: firewall-drop-wan
+    description: Firewall DROP on a WAN-facing rule
+    category: Network
+    severity: info
+    match:
+      - field: unit
+        equals: kernel
+      - field: message
+        regex: "(?i)\\bDROP\\b"
+
+  # --- task logs: generic fallback (must stay below task-failed-backup) ---
+  - id: task-failed-generic
+    description: Task exited with a non-OK status
+    category: Jobs
+    severity: warning
+    match:
+      - field: source_type
+        equals: task-log
+      - field: message
+        not_equals: OK

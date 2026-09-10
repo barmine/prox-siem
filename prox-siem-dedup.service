@@ -1,0 +1,10 @@
+[Unit]
+Description=prox-siem burst-dedup job (one-shot, run by prox-siem-dedup.timer)
+After=network.target prox-siem.service
+
+[Service]
+Type=oneshot
+User=carmine
+WorkingDirectory=/home/carmine/Projects/proxsiem
+EnvironmentFile=/home/carmine/Projects/proxsiem/.env
+ExecStart=/home/carmine/Projects/proxsiem/.venv/bin/python scripts/run_dedup.py
