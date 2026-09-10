@@ -4,6 +4,7 @@ from .config import Config
 from .dashboard import bp as dashboard_bp
 from .ingest import bp as ingest_bp
 from .opensearch_client import make_client
+from .pipeline_health import bp as pipeline_health_bp
 from .ranking import bp as ranking_bp
 from .rules_engine import RuleEngine
 
@@ -21,5 +22,6 @@ def create_app() -> Flask:
     app.register_blueprint(ingest_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(ranking_bp)
+    app.register_blueprint(pipeline_health_bp)
 
     return app

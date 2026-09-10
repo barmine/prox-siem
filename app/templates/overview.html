@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title_suffix %} &middot; overview{% endblock %}
+{% block content %}
+
+    <section class="stat-hero">
+      <p class="stat-hero__figure tnum" id="stat-figure" data-target="{{ clusters|length }}" aria-live="polite">0</p>
+      <p class="stat-hero__qualifier">
+        active <span class="accent">cluster{{ 's' if clusters|length != 1 else '' }}</span>{% if active_hostname %} on <span class="accent">{{ active_hostname }}</span>{% endif %}{% if active_category %} in <span class="accent">{{ active_category }}</span>{% endif %}, ranked by
+        severity &times; recency &times; frequency -- what actually needs attention right now.
+      </p>
+    </section>
+
+    <nav class="host-filter" aria-label="Filter by time range">
+      {% for r in range_presets %}
+      <a class="host-chip {{ 'is-active' if range_key == r }}" href="{{ url_for('dashboard.overview', hostname=active_hostname, category=active_category, range=r) }}">{{ r }}</a>
+      {% endfor %}
+      <a class="host-chip {{ 'is-active' if range_key == 'custom' }}" href="#custom-range">custom&hellip;</a>
+    </nav>
+
+    <form class="range-form" id="custom-range" method="get" action="{{ url_for('dashboard.overview') }}">
+      <input type="hidden" name="range" value="custom">
+      <input type="hidden" name="hostname" value="{{ active_hostname or '' }}">
+      <input type="hidden" name="category" value="{{ active_category or '' }}">
+      <label class="range-form__field">since (UTC)
+        <input type="datetime-local" name="since" value="{{ custom_since }}" required>
+      </label>
+      <label class="range-form__field">until (UTC, optional)
+        <input type="datetime-local" name="until" value="{{ custom_until }}">
+      </label>
+      <button class="range-form__submit" type="submit">Apply</button>
+    </form>
+
+    {% if hostnames %}
+    <nav class="host-filter" aria-label="Filter clusters by host">
+      <a class="host-chip {{ 'is-active' if not active_hostname }}" href="{{ url_for('dashboard.overview', category=active_category, range=range_key, since=custom_since, until=custom_until) }}">all hosts</a>
+      {% for h in hostnames %}
+      <a class="host-chip {{ 'is-active' if h == active_hostname }}" href="{{ url_for('dashboard.overview', hostname=h, category=active_category, range=range_key, since=custom_since, until=custom_until) }}">{{ h }}</a>
+      {% endfor %}
+    </nav>
+    {% endif %}
+
+    {% if categories %}
+    <nav class="host-filter" aria-label="Filter clusters by category">
+      <a class="host-chip {{ 'is-active' if not active_category }}" href="{{ url_for('dashboard.overview', hostname=active_hostname, range=range_key, since=custom_since, until=custom_until) }}">all categories</a>
+      {% for c in categories %}
+      <a class="host-chip {{ 'is-active' if c == active_category }}" href="{{ url_for('dashboard.overview', hostname=active_hostname, category=c, range=range_key, since=custom_since, until=custom_until) }}">{{ c }}</a>
+      {% endfor %}
+    </nav>
+    {% endif %}
+
+    {% if error %}
+      <div class="state state--error">Could not query rankings: {{ error }}</div>
+    {% elif not clusters and (active_hostname or active_category) %}
+      <div class="state">No active clusters match this filter right now. <a href="{{ url_for('dashboard.overview', range=range_key, since=custom_since, until=custom_until) }}">Clear host/category filter</a></div>
+    {% elif not clusters %}
+      <div class="state">Nothing ranked in this time range. Either nothing's matched a detection rule, or the dedup job hasn't run yet -- see <code>prox-siem-dedup.timer</code>.</div>
+    {% else %}
+    <section class="band">
+      <div class="cluster-grid">
+        {% for c in clusters %}
+        <a class="cluster-card cluster-card--{{ c.severity_label }}" href="{{ url_for('dashboard.explore', cluster=c.cluster_key) }}">
+          <div class="cluster-card__top">
+            <span class="mark mark--{{ 'error' if c.severity_label == 'critical' else c.severity_label }}"></span>
+            <span class="sev-label">{{ c.severity_label }}</span>
+            <span class="cluster-card__category">{{ c.category }}</span>
+            <span class="cluster-card__score tnum" title="severity x recency x log(frequency)">{{ c.score }}</span>
+          </div>
+          <p class="cluster-card__message">{{ c.sample_message or '(no message)' }}</p>
+          <div class="cluster-card__meta">
+            <span class="cluster-card__host">{{ c.hostname }}</span>
+            <span class="cluster-card__count">&times;{{ c.count }}</span>
+          </div>
+          <div class="cluster-card__meta cluster-card__meta--muted">
+            <span>first seen {{ c.first_seen }}</span>
+            <span>last seen {{ c.last_seen }}</span>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+{% endblock %}

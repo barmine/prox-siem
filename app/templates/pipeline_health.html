@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title_suffix %} &middot; pipeline health{% endblock %}
+{% block content %}
+
+    {% set stale_count = sources | selectattr("stale") | list | length %}
+    <section class="stat-hero">
+      <p class="stat-hero__figure tnum" id="stat-figure" data-target="{{ stale_count }}" aria-live="polite">0</p>
+      <p class="stat-hero__qualifier">
+        {% if stale_count %}
+          <span class="accent">stale source{{ 's' if stale_count != 1 else '' }}</span> out of {{ sources|length }} --
+          something in the pipeline has gone quiet longer than expected.
+        {% else %}
+          all <span class="accent">{{ sources|length }}</span> ingestion sources reporting normally.
+        {% endif %}
+      </p>
+    </section>
+
+    {% if error %}
+      <div class="state state--error">Could not query pipeline health: {{ error }}</div>
+    {% elif not sources %}
+      <div class="state">No sources seen yet. Once Fluent Bit's heartbeat starts landing (see <code>fluentbit/conf.d/common.conf</code>) and/or a notification arrives, they'll show up here.</div>
+    {% else %}
+    <section class="band">
+      <div class="card">
+        <div class="row-head" role="row">
+          <span class="ph-name">Source</span>
+          <span class="ph-kind">Kind</span>
+          <span class="ph-status">Status</span>
+          <span class="ph-lastseen">Last seen</span>
+        </div>
+        {% for s in sources %}
+        <div class="row" role="row">
+          <span class="ph-name" data-label="Source">{{ s.name }}</span>
+          <span class="ph-kind" data-label="Kind">{{ s.kind }}</span>
+          <span class="ph-status" data-label="Status">
+            <span class="mark mark--{{ 'error' if s.stale else 'info' }}"></span>
+            <span class="sev-label {{ 'stat-row__label--error' if s.stale else '' }}">{{ 'stale' if s.stale else 'ok' }}</span>
+          </span>
+          <span class="ph-lastseen" data-label="Last seen">
+            {{ s.quiet_label }} ago
+            <span class="ph-lastseen__threshold">(flags after {{ s.threshold_label }} quiet)</span>
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+{% endblock %}

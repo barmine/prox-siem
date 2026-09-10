@@ -8,7 +8,7 @@
  * display-style grotesk-sans not grotesk-heavy-lowercase, accent warm not cool
  */
 
-/* tokens.css is linked separately in <head> — see dashboard.html */
+/* tokens.css is linked separately in <head> — see templates/base.html */
 
 * { box-sizing: border-box; }
 html, body { overflow-x: clip; }
@@ -266,6 +266,104 @@ body::before {
   font-weight: 600;
 }
 
+/* ---------- search box (Explore) ---------- */
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding-block: var(--space-md) 0;
+}
+
+.search-box__input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5em 0.9em;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-rule);
+  background: var(--color-paper-2);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+}
+
+.search-box__input::placeholder { color: var(--color-muted); }
+
+.search-box__submit {
+  padding: 0.5em 1em;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-rule);
+  background: transparent;
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+.search-box__submit:hover { color: var(--color-accent); border-color: var(--color-accent); }
+
+.search-box__clear {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  white-space: nowrap;
+}
+
+.search-box__clear:hover { color: var(--color-accent); }
+
+/* ---------- custom time-range form (Overview) ---------- */
+
+.range-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-md);
+  padding-block: var(--space-sm) 0;
+}
+
+.range-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25em;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.range-form__field input {
+  padding: 0.4em 0.6em;
+  border-radius: 6px;
+  border: 1px solid var(--color-rule);
+  background: var(--color-paper-2);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.range-form__submit {
+  padding: 0.5em 1em;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-rule);
+  background: transparent;
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.range-form__submit:hover { color: var(--color-accent); border-color: var(--color-accent); }
+
 /* ---------- event band: elevated card, hairline rows inside ---------- */
 
 .band { padding-block: var(--space-xl) var(--space-3xl); }
@@ -306,6 +404,14 @@ body::before {
 .c-host   { grid-column: span 2; color: var(--color-muted); font-size: var(--text-sm); overflow-wrap: anywhere; }
 .c-host a { color: inherit; text-decoration: underline; text-decoration-color: var(--color-rule); text-underline-offset: 0.15em; }
 .c-host a:hover { color: var(--color-accent); text-decoration-color: var(--color-accent); }
+
+/* ---------- pipeline health rows ---------- */
+
+.ph-name     { grid-column: span 4; font-weight: 600; color: var(--color-ink); }
+.ph-kind     { grid-column: span 2; color: var(--color-muted); font-size: var(--text-sm); }
+.ph-status   { grid-column: span 2; display: flex; align-items: center; gap: var(--space-xs); }
+.ph-lastseen { grid-column: span 4; color: var(--color-muted); font-size: var(--text-sm); }
+.ph-lastseen__threshold { display: block; font-size: var(--text-xs); opacity: 0.7; }
 
 .c-body__title { font-weight: 600; color: var(--color-ink); }
 .c-body__message { color: var(--color-muted); font-size: var(--text-sm); overflow-wrap: anywhere; }
@@ -526,11 +632,15 @@ body::before {
     padding-block: var(--space-md);
   }
 
-  .c-time, .c-sev, .c-body, .c-type, .c-host { grid-column: 1; }
+  .c-time, .c-sev, .c-body, .c-type, .c-host,
+  .ph-name, .ph-kind, .ph-status, .ph-lastseen { grid-column: 1; }
 
   .c-time::before,
   .c-type::before,
-  .c-host::before {
+  .c-host::before,
+  .ph-kind::before,
+  .ph-status::before,
+  .ph-lastseen::before {
     content: attr(data-label);
     display: block;
     font-family: var(--font-mono);
