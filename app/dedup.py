@@ -16,9 +16,8 @@ import hashlib
 import re
 from datetime import datetime, timedelta, timezone
 
-from opensearchpy.exceptions import NotFoundError
-
-from .alerting import send_alert
+from .alerting import apply_alert_throttle
+from .mutes import get_active_mutes, is_muted
 
 _DIGITS = re.compile(r"\d+")
 
@@ -48,6 +47,8 @@ def run_once(client, config, rules=None):
     retention = timedelta(minutes=config["DEDUP_RETENTION_MINUTES"])
     now = datetime.now(timezone.utc)
     window_start = now - lookback
+
+    mutes = get_active_mutes(client, config)
 
     resp = client.search(
         index=f"{prefix}-*",
@@ -94,27 +95,30 @@ def run_once(client, config, rules=None):
         bucket["last_seen"] = doc["timestamp"]  # hits sorted asc by timestamp
         bucket["doc_ids"].append((hit["_index"], hit["_id"]))
 
-    for bucket in buckets.values():
-        # Phase 4 alerting: fire once when a cluster crosses into critical,
-        # not on every recurrence. `alerted` lives on the cluster doc
-        # itself so the throttle survives across runs with no extra
-        # infra -- and a cluster that ages out (deleted by the retention
-        # cleanup below) and later reappears as a fresh burst naturally
-        # gets a new alert, which is correct: that's a new occurrence.
-        alerted = False
-        if rules is not None and rules.label_for_weight(bucket["severity_weight"]) == "critical":
-            try:
-                existing = client.get(index=clusters_index, id=bucket["cluster_key"])
-                alerted = bool(existing["_source"].get("alerted"))
-            except NotFoundError:
-                alerted = False
+    muted_keys = []
+    for key, bucket in list(buckets.items()):
+        if is_muted(mutes, bucket["rule_id"], bucket["hostname"]):
+            # Muted -- don't cluster/rank it (and if it was clustered
+            # before the mute was added, remove that immediately rather
+            # than waiting for it to passively age out). Raw docs keep
+            # their rule_id/category tags regardless; only the
+            # clustered/ranked view respects mutes.
+            muted_keys.append(key)
+            del buckets[key]
+            client.delete(index=clusters_index, id=key, ignore=[404])
 
-            if not alerted:
-                try:
-                    send_alert(config, bucket)
-                except Exception:
-                    pass  # best-effort -- a broken webhook target shouldn't break dedup
-            alerted = True
+    for bucket in buckets.values():
+        # Phase 4 alerting: fire once when a cluster crosses into
+        # critical, not on every recurrence -- see
+        # app/alerting.py:apply_alert_throttle. `alerted` lives on the
+        # cluster doc itself so the throttle survives across runs with no
+        # extra infra, and a cluster that ages out (deleted by the
+        # retention cleanup below) and later reappears as a fresh burst
+        # naturally gets a new alert, which is correct: that's a new
+        # occurrence.
+        alerted = apply_alert_throttle(
+            client, clusters_index, bucket["cluster_key"], rules, bucket["severity_weight"], bucket, config
+        )
 
         client.index(
             index=clusters_index,
@@ -131,6 +135,7 @@ def run_once(client, config, rules=None):
                 "last_seen": bucket["last_seen"],
                 "updated_at": now.isoformat(),
                 "alerted": alerted,
+                "detection_method": "rule",
             },
         )
 
@@ -142,9 +147,17 @@ def run_once(client, config, rules=None):
             client.bulk(body=bulk_body)
 
     # Tidy up clusters that fell out of the window and are old enough to be
-    # clearly resolved rather than just quiet between bursts.
+    # clearly resolved rather than just quiet between bursts. Muted keys
+    # are already deleted above, so they don't need protecting here.
+    # Excludes detection_method: anomaly -- app/anomaly.py owns the same
+    # cleanup for its own clusters in this same index, independently.
+    # (Excluding "anomaly" rather than requiring "rule" so clusters
+    # written before this field existed -- which have neither value --
+    # still get cleaned up here instead of becoming orphaned.)
     seen_keys = list(buckets.keys())
-    must_not = [{"terms": {"cluster_key": seen_keys}}] if seen_keys else []
+    must_not = [{"term": {"detection_method": "anomaly"}}]
+    if seen_keys:
+        must_not.append({"terms": {"cluster_key": seen_keys}})
     client.delete_by_query(
         index=clusters_index,
         body={
@@ -160,4 +173,4 @@ def run_once(client, config, rules=None):
         # concurrent run shouldn't fail the whole job.
     )
 
-    return {"buckets": len(buckets), "docs_processed": len(hits)}
+    return {"buckets": len(buckets), "docs_processed": len(hits), "muted": len(muted_keys)}

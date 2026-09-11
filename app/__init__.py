@@ -3,6 +3,7 @@ from flask import Flask
 from .config import Config
 from .dashboard import bp as dashboard_bp
 from .ingest import bp as ingest_bp
+from .mutes import bp as mutes_bp
 from .opensearch_client import make_client
 from .pipeline_health import bp as pipeline_health_bp
 from .ranking import bp as ranking_bp
@@ -23,5 +24,6 @@ def create_app() -> Flask:
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(ranking_bp)
     app.register_blueprint(pipeline_health_bp)
+    app.register_blueprint(mutes_bp)
 
     return app

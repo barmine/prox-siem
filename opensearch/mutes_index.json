@@ -1,0 +1,14 @@
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0
+  },
+  "mappings": {
+    "properties": {
+      "rule_id": { "type": "keyword" },
+      "hostname": { "type": "keyword" },
+      "reason": { "type": "text" },
+      "created_at": { "type": "date" }
+    }
+  }
+}

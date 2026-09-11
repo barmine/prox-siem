@@ -34,7 +34,9 @@ def score_cluster(cluster, now, half_life_minutes):
     return weight * recency * frequency_factor
 
 
-def get_top_clusters(client, config, limit=None, hostname=None, category=None, since=None, until=None):
+def get_top_clusters(
+    client, config, limit=None, hostname=None, category=None, detection_method=None, since=None, until=None
+):
     """since/until are datetimes (tz-aware) bounding cluster.last_seen; since
     defaults to config's RANKING_ACTIVE_WINDOW_HOURS when not given, until is
     open-ended (no upper bound) when not given -- so the default call is
@@ -52,6 +54,8 @@ def get_top_clusters(client, config, limit=None, hostname=None, category=None, s
         filters.append({"term": {"hostname": hostname}})
     if category:
         filters.append({"term": {"category": category}})
+    if detection_method:
+        filters.append({"term": {"detection_method": detection_method}})
 
     resp = client.search(
         index=config["CLUSTERS_INDEX"],
@@ -112,6 +116,23 @@ def get_cluster_categories(client, config):
     return sorted(b["key"] for b in buckets if b["key"])
 
 
+def get_cluster_detection_methods(client, config):
+    """Same idea as get_cluster_hostnames but for detection_method
+    ("rule" vs Phase 5's "anomaly") -- lets Overview isolate one
+    detection path from the other."""
+    resp = client.search(
+        index=config["CLUSTERS_INDEX"],
+        body={
+            "size": 0,
+            "query": _facet_lookback_query(config),
+            "aggs": {"by_method": {"terms": {"field": "detection_method", "size": 10}}},
+        },
+        ignore_unavailable=True,
+    )
+    buckets = resp.get("aggregations", {}).get("by_method", {}).get("buckets", [])
+    return sorted(b["key"] for b in buckets if b["key"])
+
+
 @bp.route("/api/top-important")
 def top_important():
     client = current_app.extensions["opensearch"]
@@ -121,9 +142,17 @@ def top_important():
         limit = current_app.config["RANKING_DEFAULT_LIMIT"]
     hostname = request.args.get("hostname") or None
     category = request.args.get("category") or None
+    detection_method = request.args.get("detection_method") or None
 
     try:
-        clusters = get_top_clusters(client, current_app.config, limit=limit, hostname=hostname, category=category)
+        clusters = get_top_clusters(
+            client,
+            current_app.config,
+            limit=limit,
+            hostname=hostname,
+            category=category,
+            detection_method=detection_method,
+        )
     except Exception as exc:
         return jsonify({"error": str(exc)}), 502
 

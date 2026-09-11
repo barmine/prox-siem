@@ -2,7 +2,8 @@ from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, current_app, redirect, render_template, request, url_for
 
-from .ranking import get_cluster_categories, get_cluster_hostnames, get_top_clusters
+from .mutes import add_mute
+from .ranking import get_cluster_categories, get_cluster_detection_methods, get_cluster_hostnames, get_top_clusters
 
 bp = Blueprint("dashboard", __name__)
 
@@ -43,6 +44,7 @@ def overview():
     rules = current_app.extensions["rules"]
     active_hostname = request.args.get("hostname") or None
     active_category = request.args.get("category") or None
+    active_detection_method = request.args.get("detection_method") or None
     range_key = request.args.get("range") or DEFAULT_RANGE
     custom_since_input = request.args.get("since", "")
     custom_until_input = request.args.get("until", "")
@@ -71,18 +73,21 @@ def overview():
     clusters = []
     hostnames = []
     categories = []
+    detection_methods = []
     try:
         # Facet chips stay populated even when range_error blocks the
         # actual cluster query below -- you should still be able to see/
         # change the host or category filter while fixing a bad range.
         hostnames = get_cluster_hostnames(client, current_app.config)
         categories = get_cluster_categories(client, current_app.config)
+        detection_methods = get_cluster_detection_methods(client, current_app.config)
         if range_error is None:
             clusters = get_top_clusters(
                 client,
                 current_app.config,
                 hostname=active_hostname,
                 category=active_category,
+                detection_method=active_detection_method,
                 since=since,
                 until=until,
             )
@@ -96,8 +101,10 @@ def overview():
         clusters=clusters,
         hostnames=hostnames,
         categories=categories,
+        detection_methods=detection_methods,
         active_hostname=active_hostname,
         active_category=active_category,
+        active_detection_method=active_detection_method,
         active_view="overview",
         range_key=range_key,
         range_presets=list(RANGE_PRESETS.keys()),
@@ -108,6 +115,19 @@ def overview():
         custom_until=custom_until_input,
         error=error,
     )
+
+
+@bp.route("/overview/mute", methods=["POST"])
+def overview_mute():
+    """Quick "mute this" action from an Overview cluster card -- always
+    host-scoped (the safer, more common case); an all-hosts mute is
+    created via the dedicated /mutes page instead."""
+    client = current_app.extensions["opensearch"]
+    rule_id = request.form.get("rule_id")
+    hostname = request.form.get("hostname")
+    if rule_id and hostname:
+        add_mute(client, current_app.config, rule_id, hostname, reason="muted from Overview")
+    return redirect(request.form.get("next") or url_for("dashboard.overview"))
 
 
 @bp.route("/top")

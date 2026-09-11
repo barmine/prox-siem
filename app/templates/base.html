@@ -22,6 +22,7 @@
       <a class="view-tab {{ 'is-active' if active_view == 'overview' else '' }}" href="{{ url_for('dashboard.overview') }}">overview</a>
       <a class="view-tab {{ 'is-active' if active_view == 'explore' else '' }}" href="{{ url_for('dashboard.explore') }}">explore</a>
       <a class="view-tab {{ 'is-active' if active_view == 'pipeline_health' else '' }}" href="{{ url_for('pipeline_health.index') }}">pipeline health</a>
+      <a class="view-tab {{ 'is-active' if active_view == 'mutes' else '' }}" href="{{ url_for('mutes.index') }}">mutes</a>
     </nav>
 
     {% block content %}{% endblock %}

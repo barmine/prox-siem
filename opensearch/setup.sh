@@ -48,6 +48,25 @@ curl -s -X PUT "${OPENSEARCH_URL}/proxmox-clusters" \
   -d @"${DIR}/clusters_index.json"
 echo
 
+# Unlike the index-create PUT above (which no-ops with an error on an
+# index that already exists), adding new fields to an EXISTING mapping
+# needs its own PUT to _mapping -- otherwise a field added to
+# clusters_index.json after proxmox-clusters was already created (e.g.
+# Phase 5's alerted/detection_method) would silently never apply on a
+# re-run. Safe to always run: re-declaring an existing field is a no-op.
+echo "Updating mapping: proxmox-clusters (picks up any new fields)"
+python3 -c "import json,sys; print(json.dumps(json.load(open(sys.argv[1]))['mappings']))" "${DIR}/clusters_index.json" \
+  | curl -s -X PUT "${OPENSEARCH_URL}/proxmox-clusters/_mapping" -H 'Content-Type: application/json' -d @-
+echo
+
+# Phase 5: mutes index (noise suppression) -- same idempotency note as
+# proxmox-clusters above.
+echo "Creating index: proxmox-mutes"
+curl -s -X PUT "${OPENSEARCH_URL}/proxmox-mutes" \
+  -H 'Content-Type: application/json' \
+  -d @"${DIR}/mutes_index.json"
+echo
+
 echo "Generating ingest pipeline: proxmox-logs-rules (from rules.yaml)"
 OPENSEARCH_URL="${OPENSEARCH_URL}" python3 "${DIR}/generate_rules_pipeline.py"
 echo

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title_suffix %} &middot; mutes{% endblock %}
+{% block content %}
+
+    <form class="range-form" method="post" action="{{ url_for('mutes.create') }}">
+      <label class="range-form__field">rule_id
+        <select name="rule_id" required>
+          <option value="" disabled selected>choose a rule&hellip;</option>
+          {% for r in rule_ids %}
+          <option value="{{ r }}">{{ r }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="range-form__field">hostname (blank = all hosts)
+        <input type="text" name="hostname" placeholder="e.g. epyc">
+      </label>
+      <label class="range-form__field">reason (optional)
+        <input type="text" name="reason" placeholder="why this is safe to suppress">
+      </label>
+      <button class="range-form__submit" type="submit">Add mute</button>
+    </form>
+
+    {% if error %}
+      <div class="state state--error">Could not query mutes: {{ error }}</div>
+    {% elif not mutes %}
+      <div class="state">Nothing muted right now. Add one above, or use the "Mute" action on an Overview cluster card.</div>
+    {% else %}
+    <section class="band">
+      <div class="card">
+        <div class="row-head" role="row">
+          <span class="mt-rule">Rule</span>
+          <span class="mt-host">Host</span>
+          <span class="mt-reason">Reason</span>
+          <span class="mt-created">Muted since</span>
+          <span class="mt-action">&nbsp;</span>
+        </div>
+        {% for m in mutes %}
+        <div class="row" role="row">
+          <span class="mt-rule" data-label="Rule">{{ m.rule_id }}</span>
+          <span class="mt-host" data-label="Host">{{ m.hostname or 'all hosts' }}</span>
+          <span class="mt-reason" data-label="Reason">{{ m.reason or '(no reason given)' }}</span>
+          <span class="mt-created" data-label="Muted since">{{ m.created_at }}</span>
+          <span class="mt-action" data-label="">
+            <form method="post" action="{{ url_for('mutes.delete', mute_id=m.mute_id) }}">
+              <button class="mt-unmute" type="submit">Unmute</button>
+            </form>
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+{% endblock %}
