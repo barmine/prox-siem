@@ -48,6 +48,7 @@ def overview():
     custom_until_input = request.args.get("until", "")
 
     since = until = None
+    range_error = None
     if range_key == "custom":
         since = _parse_local_dt(custom_since_input)
         until = _parse_local_dt(custom_until_input)
@@ -55,6 +56,13 @@ def overview():
             # No usable lower bound to query with -- fall back to the
             # default preset rather than erroring on a half-filled form.
             range_key = DEFAULT_RANGE
+        elif until is not None and until <= since:
+            # A swapped/invalid range silently returns zero results from
+            # OpenSearch (gte > lte just never matches) -- that reads as
+            # "nothing happened" when it's actually "this range can't
+            # match anything," so surface it instead of guessing.
+            range_error = "'until' must be after 'since' -- showing nothing until that's fixed."
+            since = until = None
     if range_key != "custom":
         since = datetime.now(timezone.utc) - timedelta(hours=RANGE_PRESETS.get(range_key, RANGE_PRESETS[DEFAULT_RANGE]))
         until = None
@@ -64,18 +72,22 @@ def overview():
     hostnames = []
     categories = []
     try:
-        clusters = get_top_clusters(
-            client,
-            current_app.config,
-            hostname=active_hostname,
-            category=active_category,
-            since=since,
-            until=until,
-        )
-        for cluster in clusters:
-            cluster["severity_label"] = rules.label_for_weight(cluster.get("severity_weight"))
+        # Facet chips stay populated even when range_error blocks the
+        # actual cluster query below -- you should still be able to see/
+        # change the host or category filter while fixing a bad range.
         hostnames = get_cluster_hostnames(client, current_app.config)
         categories = get_cluster_categories(client, current_app.config)
+        if range_error is None:
+            clusters = get_top_clusters(
+                client,
+                current_app.config,
+                hostname=active_hostname,
+                category=active_category,
+                since=since,
+                until=until,
+            )
+            for cluster in clusters:
+                cluster["severity_label"] = rules.label_for_weight(cluster.get("severity_weight"))
     except Exception as exc:
         error = str(exc)
 
@@ -89,6 +101,9 @@ def overview():
         active_view="overview",
         range_key=range_key,
         range_presets=list(RANGE_PRESETS.keys()),
+        range_error=range_error,
+        range_since=since,
+        range_until=until,
         custom_since=custom_since_input,
         custom_until=custom_until_input,
         error=error,

@@ -50,10 +50,16 @@
 
     {% if error %}
       <div class="state state--error">Could not query rankings: {{ error }}</div>
+    {% elif range_error %}
+      <div class="state state--error">{{ range_error }}</div>
     {% elif not clusters and (active_hostname or active_category) %}
       <div class="state">No active clusters match this filter right now. <a href="{{ url_for('dashboard.overview', range=range_key, since=custom_since, until=custom_until) }}">Clear host/category filter</a></div>
     {% elif not clusters %}
-      <div class="state">Nothing ranked in this time range. Either nothing's matched a detection rule, or the dedup job hasn't run yet -- see <code>prox-siem-dedup.timer</code>.</div>
+      <div class="state">
+        Nothing ranked between <strong>{{ range_since.strftime('%Y-%m-%d %H:%M') }}</strong> and
+        <strong>{{ range_until.strftime('%Y-%m-%d %H:%M') if range_until else 'now' }}</strong> (UTC).
+        Either nothing's matched a detection rule in that window, or the dedup job hasn't run yet -- see <code>prox-siem-dedup.timer</code>.
+      </div>
     {% else %}
     <section class="band">
       <div class="cluster-grid">
