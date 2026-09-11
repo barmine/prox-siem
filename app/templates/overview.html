@@ -4,10 +4,6 @@
 
     <section class="stat-hero">
       <p class="stat-hero__figure tnum" id="stat-figure" data-target="{{ clusters|length }}" aria-live="polite">0</p>
-      <p class="stat-hero__qualifier">
-        active <span class="accent">cluster{{ 's' if clusters|length != 1 else '' }}</span>{% if active_hostname %} on <span class="accent">{{ active_hostname }}</span>{% endif %}{% if active_category %} in <span class="accent">{{ active_category }}</span>{% endif %}, ranked by
-        severity &times; recency &times; frequency -- what actually needs attention right now.
-      </p>
     </section>
 
     <nav class="host-filter" aria-label="Filter by time range">
