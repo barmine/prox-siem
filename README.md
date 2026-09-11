@@ -21,6 +21,15 @@ A homelab SIEM for Proxmox VE + Proxmox Backup Server.
   when a cluster first turns critical. ISM hot-tier retention is now a
   config value. See
   [`docs/phase4-operations.md`](docs/phase4-operations.md).
+- **Phase 5 (done):** a second detection path -- volume-baseline anomaly
+  detection -- flags a normally-quiet log type suddenly spiking, even
+  with no line matching a known-bad pattern, and feeds it into the same
+  clustering/ranking pipeline (tagged distinctly on Overview so you can
+  tell rule-hits from anomaly-hits apart). A mute workflow lets you
+  suppress a confirmed-benign `(rule, host)` pair from the dashboard
+  instead of hand-editing `rules.yaml` -- it stays out of Overview while
+  the raw events stay fully searchable in Explore. See
+  [`docs/phase5-operations.md`](docs/phase5-operations.md).
 
 Phase 1 deliberately skipped log parsing — Proxmox notifications already
 arrive as structured, severity-tagged JSON for backup/replication/GC/sync/
@@ -71,22 +80,27 @@ app/
   dashboard.py              GET  /  (Overview), /explore (Explore), /top (redirect)
   rules_engine.py           loads rules.yaml, matches notification-path docs
   dedup.py                  burst-dedup: groups matched docs into clusters, fires alerts
+  anomaly.py                Phase 5: volume-baseline anomaly detection, same clusters index
+  mutes.py                  Phase 5: GET/POST /mutes — noise-suppression workflow
   ranking.py                GET /api/top-important — scores active clusters
   alerting.py               Phase 4: outbound webhook notifications (ntfy/Discord/Gotify)
   pipeline_health.py         GET /pipeline-health — per-source last-seen tracking
   templates/base.html        shared shell (nav/footer) — overview.html, explore.html,
-                             pipeline_health.html all extend it
+                             pipeline_health.html, mutes.html all extend it
 fluentbit/                Phase 2: Fluent Bit config, per host role (pve/pbs) + install.sh
                           (raw-log path tagged via the rules ingest pipeline; common.conf
                           also emits a Phase 4 per-host heartbeat)
 scripts/run_dedup.py      standalone entrypoint for prox-siem-dedup.timer
+scripts/run_anomaly.py    standalone entrypoint for prox-siem-anomaly.timer
 scripts/test_phase3.py    end-to-end test: synthetic events -> tag -> dedup -> rank
 docs/webhook-setup.md     Phase 1: exact steps for the PVE node + both PBS instances
 docs/log-shipping-setup.md Phase 2: exact steps for installing Fluent Bit on each host
 docs/detection-rules.md   Phase 3: rules.yaml syntax, dedup, ranking, testing
 docs/phase4-operations.md Phase 4: Pipeline Health, alerting, ISM retention config
+docs/phase5-operations.md Phase 5: anomaly tuning, mute workflow, how to extend this
 prox-siem.service         optional systemd unit (gunicorn)
-prox-siem-dedup.service/.timer  runs the dedup job every ~60s
+prox-siem-dedup.service/.timer    runs the dedup job every ~60s
+prox-siem-anomaly.service/.timer  runs the anomaly job every ~1h
 ```
 
 The ingestion API and dashboard are two Flask blueprints in one process —

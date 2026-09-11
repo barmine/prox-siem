@@ -89,6 +89,14 @@ days) -- so a raw event can still be sitting in Explore for weeks after its
 been cleaned up. If you want cluster history to track raw-log retention
 1:1, set `DEDUP_RETENTION_MINUTES` to match (30 days = `43200`).
 
+**Phase 5 additions**: every cluster doc now also carries
+`detection_method` (`"rule"` here, `"anomaly"` for
+`app/anomaly.py`'s volume-baseline hits sharing this same
+`proxmox-clusters` index -- see `docs/phase5-operations.md`), and
+`run_once()` checks `app/mutes.py`'s active mute list before clustering
+anything, dropping (and immediately deleting any existing cluster for)
+a muted `(rule_id, hostname)` pair.
+
 Install once on the SIEM VM (edit `User=`/paths first, same as
 `prox-siem.service`):
 

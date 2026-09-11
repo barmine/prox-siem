@@ -25,7 +25,10 @@ def main():
     client = make_client(config["OPENSEARCH_URL"])
     rules = RuleEngine(config["RULES_PATH"])
     result = run_once(client, config, rules=rules)
-    print(f"dedup: processed {result['docs_processed']} docs into {result['buckets']} clusters")
+    print(
+        f"dedup: processed {result['docs_processed']} docs into {result['buckets']} clusters "
+        f"({result['muted']} muted)"
+    )
 
 
 if __name__ == "__main__":
