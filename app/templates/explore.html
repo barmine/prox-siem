@@ -4,18 +4,6 @@
 
     <section class="stat-hero">
       <p class="stat-hero__figure tnum" id="stat-figure" data-target="{{ total }}" aria-live="polite">0</p>
-      <p class="stat-hero__qualifier">
-        {% if active_cluster %}
-          events in this <span class="accent">cluster</span>.
-          <a href="{{ url_for('dashboard.overview') }}">&larr; back to overview</a>
-        {% else %}
-          {% if active_severity %}<span class="accent">{{ active_severity }}</span>{% else %}all{% endif %}
-          events{% if active_hostname %} on <span class="accent">{{ active_hostname }}</span>{% endif %}
-          {% if active_query %}matching <span class="accent">&ldquo;{{ active_query }}&rdquo;</span>{% endif %}
-          logged across your <span class="accent">proxmox ve</span> node and
-          <span class="accent">pbs</span> instances.
-        {% endif %}
-      </p>
     </section>
 
     <form class="search-box" method="get" action="{{ url_for('dashboard.explore') }}" role="search" aria-label="Search events">
