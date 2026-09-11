@@ -1,0 +1,10 @@
+[Unit]
+Description=prox-siem volume-anomaly job (one-shot, run by prox-siem-anomaly.timer)
+After=network.target prox-siem.service
+
+[Service]
+Type=oneshot
+User=carmine
+WorkingDirectory=/home/carmine/Projects/proxsiem
+EnvironmentFile=/home/carmine/Projects/proxsiem/.env
+ExecStart=/home/carmine/Projects/proxsiem/.venv/bin/python scripts/run_anomaly.py

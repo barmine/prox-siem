@@ -1,0 +1,10 @@
+[Unit]
+Description=Run prox-siem-anomaly.service every hour
+
+[Timer]
+OnBootSec=5m
+OnUnitActiveSec=1h
+AccuracySec=1m
+
+[Install]
+WantedBy=timers.target

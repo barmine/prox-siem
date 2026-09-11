@@ -14,7 +14,9 @@
       "count": { "type": "integer" },
       "first_seen": { "type": "date" },
       "last_seen": { "type": "date" },
-      "updated_at": { "type": "date" }
+      "updated_at": { "type": "date" },
+      "alerted": { "type": "boolean" },
+      "detection_method": { "type": "keyword" }
     }
   }
 }

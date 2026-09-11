@@ -1,7 +1,7 @@
-"""Phase 4: outbound alerting. Fires when a cluster crosses into critical
-severity for the first time -- the "first time" check lives in
-app/dedup.py's run_once() (it knows the previous state of the cluster
-doc), this module only knows how to build and send one notification.
+"""Phase 4/5: outbound alerting. Fires when a cluster crosses into critical
+severity for the first time -- the "first time" check is
+apply_alert_throttle() below, shared by app/dedup.py (pattern-rule
+clusters) and app/anomaly.py (Phase 5 volume-anomaly clusters).
 
 ALERT_TARGET_TYPE picks the payload shape; ALERT_WEBHOOK_URL is always the
 *full* target URL (an ntfy topic URL, a Discord webhook URL, a Gotify
@@ -11,6 +11,8 @@ plus a dispatch-table entry.
 """
 import json
 import urllib.request
+
+from opensearchpy.exceptions import NotFoundError
 
 
 def _build_message(cluster):
@@ -62,4 +64,32 @@ def send_alert(config, cluster):
         return False
     title, body = _build_message(cluster)
     sender(config["ALERT_WEBHOOK_URL"], title, body)
+    return True
+
+
+def apply_alert_throttle(client, clusters_index, cluster_key, rules, severity_weight, cluster_body, config):
+    """Shared by app/dedup.py and app/anomaly.py: fires once when a
+    cluster crosses into critical, not on every recurrence while it's
+    still active. Returns the `alerted` value the caller should persist
+    on the cluster doc it's about to write.
+
+    A cluster that ages out (deleted by dedup's retention cleanup) and
+    later reappears as a fresh burst has no prior doc, so this correctly
+    treats it as a new occurrence and alerts again -- that's the point,
+    not a bug.
+    """
+    if rules is None or rules.label_for_weight(severity_weight) != "critical":
+        return False
+
+    try:
+        existing = client.get(index=clusters_index, id=cluster_key)
+        alerted = bool(existing["_source"].get("alerted"))
+    except NotFoundError:
+        alerted = False
+
+    if not alerted:
+        try:
+            send_alert(config, cluster_body)
+        except Exception:
+            pass  # best-effort -- a broken webhook target shouldn't break dedup/anomaly runs
     return True
