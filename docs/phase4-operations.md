@@ -15,7 +15,11 @@ Same ranking as before (severity x recency x log(frequency)), now with:
   host filter.
 - **Time range**: `1h` / `24h` / `7d` preset chips, or `custom` with
   `since`/`until` (UTC, matches every other timestamp in the app --
-  there's no per-user timezone concept anywhere else here).
+  there's no per-user timezone concept anywhere else here). A swapped
+  range (`since` after `until`) is validated and surfaced as an explicit
+  error rather than silently returning zero results -- `gte > lte` would
+  otherwise just never match anything in OpenSearch, which reads as "no
+  clusters" instead of "this range can't work."
 
 **Why `DEDUP_RETENTION_MINUTES` changed from 2h to 7d default**: clusters
 are hard-deleted from `proxmox-clusters` once they've been quiet longer

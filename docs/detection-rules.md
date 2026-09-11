@@ -15,7 +15,7 @@ proxmox-logs-* write  --(ingest pipeline, generated from rules.yaml)-->  tagged 
                                         v
                          proxmox-clusters (one doc per burst)
                                         |
-                    GET /api/top-important  /  dashboard "Top Important" tab
+                    GET /api/top-important  /  Overview page (`/`)
                               (app/ranking.py, app/dashboard.py)
 ```
 
@@ -48,6 +48,22 @@ than `fields.type`, because `fields.type`'s real values haven't been
 confirmed against a live Proxmox webhook payload yet (same caveat as
 `docs/webhook-setup.md`). Tighten them once real payloads have been seen.
 
+**`severity` and `severity_weight` are two different, independent
+judgments -- expect them to disagree.** `severity` (the badge shown per
+row in Explore) is whatever the *source* logged the line at -- for
+Fluent Bit's journal path that's journald's `PRIORITY`, mapped by
+`priority_to_severity()` in `fluentbit/filters.lua`; it reflects how
+sshd/the kernel/etc. classified their own message, not this app's
+opinion. `severity_weight` (via the matched rule's `severity:` in
+rules.yaml, e.g. `pam-auth-failure` -> `critical`) is this app's own
+security judgment, and it's what actually drives Overview's ranking and
+cluster-card color. A failed SSH login is a good example of these
+disagreeing: OpenSSH's `sshd-session` often logs "Failed password" at
+journald priority `info`, so that's the badge you'll see in Explore, even
+though `pam-auth-failure` correctly scores it critical for ranking. Don't
+read the Explore badge as this app's importance assessment -- that's what
+the category pill and Overview ranking are for.
+
 ## Dedup (`app/dedup.py`, `prox-siem-dedup.timer`)
 
 Runs as a **separate systemd timer**, not an in-process scheduler --
@@ -62,7 +78,16 @@ now" needs. Grouping key: `rule_id` + `hostname` + a normalized message
 (digits/IPs collapsed to `#`, so 500 firewall drops differing only by
 source port land in one bucket). Raw docs get tagged with the resulting
 `cluster_key` for exact drill-down; clusters not refreshed by a run in
-`DEDUP_RETENTION_MINUTES` (default 120) get deleted as resolved.
+`DEDUP_RETENTION_MINUTES` (default 7 days, i.e. `10080` -- bumped up in
+Phase 4 so Overview's 7d/custom range picker has something to show; see
+`docs/phase4-operations.md`) get deleted as resolved.
+
+**This is a separate retention setting from the raw logs.** `proxmox-logs-*`
+itself is governed by the ISM policy (`ISM_HOT_RETENTION_DAYS`, default 30
+days) -- so a raw event can still be sitting in Explore for weeks after its
+*cluster* entry (and therefore its visibility in Overview) has already
+been cleaned up. If you want cluster history to track raw-log retention
+1:1, set `DEDUP_RETENTION_MINUTES` to match (30 days = `43200`).
 
 Install once on the SIEM VM (edit `User=`/paths first, same as
 `prox-siem.service`):
@@ -83,8 +108,10 @@ critical event (`count == 1`) would otherwise score exactly zero
 severity -- the opposite of the point of this phase.
 
 Only clusters seen within `RANKING_ACTIVE_WINDOW_HOURS` (default 24) count
-as "active". `GET /api/top-important?limit=50` returns the ranked JSON;
-the dashboard's "Top Important" tab calls the same `get_top_clusters()`
+as "active" -- this is the *default* preset on Overview's time-range
+picker, not a hard limit; Overview can widen it (1h/24h/7d/custom, see
+`docs/phase4-operations.md`). `GET /api/top-important?limit=50` returns
+the ranked JSON; the Overview page calls the same `get_top_clusters()`
 function directly rather than hitting its own HTTP endpoint.
 
 ## Testing end-to-end
