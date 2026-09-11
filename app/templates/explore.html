@@ -2,10 +2,6 @@
 {% block title_suffix %} &middot; explore{% endblock %}
 {% block content %}
 
-    <section class="stat-hero">
-      <p class="stat-hero__figure tnum" id="stat-figure" data-target="{{ total }}" aria-live="polite">0</p>
-    </section>
-
     <form class="search-box" method="get" action="{{ url_for('dashboard.explore') }}" role="search" aria-label="Search events">
       <input type="hidden" name="severity" value="{{ active_severity or '' }}">
       <input type="hidden" name="hostname" value="{{ active_hostname or '' }}">

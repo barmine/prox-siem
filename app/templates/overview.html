@@ -2,10 +2,6 @@
 {% block title_suffix %} &middot; overview{% endblock %}
 {% block content %}
 
-    <section class="stat-hero">
-      <p class="stat-hero__figure tnum" id="stat-figure" data-target="{{ clusters|length }}" aria-live="polite">0</p>
-    </section>
-
     <nav class="host-filter" aria-label="Filter by time range">
       {% for r in range_presets %}
       <a class="host-chip {{ 'is-active' if range_key == r }}" href="{{ url_for('dashboard.overview', hostname=active_hostname, category=active_category, range=r) }}">{{ r }}</a>
